@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}Hiring Intelligence Platform{% endblock %}</title>
+    <link rel="stylesheet" href="{% load static %}{% static 'css/main.css' %}" />
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-brand">HiringAI</div>
+        <div class="navbar-links">
+            <a href="/api/v1/">API</a>
+            <a href="/admin/">Admin</a>
+        </div>
+    </nav>
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+    <footer class="footer">
+        <p>Explainable AI Hiring Intelligence Platform</p>
+    </footer>
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>
