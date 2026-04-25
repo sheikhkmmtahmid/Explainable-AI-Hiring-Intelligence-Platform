@@ -7,9 +7,10 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-# Threshold below which disparate impact is considered biased (4/5 rule)
+# 4/5 rule threshold for disparate impact
 DISPARATE_IMPACT_THRESHOLD = 0.8
-SHORTLIST_SCORE_THRESHOLD = 0.5
+# Top fraction of ranked candidates considered "shortlisted" (top 20%)
+SHORTLIST_TOP_PCT = 0.20
 
 
 def compute_fairness_report(job_id: int, protected_attribute: str) -> dict:
@@ -17,7 +18,18 @@ def compute_fairness_report(job_id: int, protected_attribute: str) -> dict:
     from apps.candidates.models import Candidate
     from .models import FairnessReport, SubgroupMetric
 
-    job_results = MatchResult.objects.filter(job_id=job_id).select_related("candidate")
+    # Order by rank so the top-N cutoff is straightforward
+    job_results = list(
+        MatchResult.objects.filter(job_id=job_id)
+        .select_related("candidate")
+        .order_by("rank")
+    )
+    if not job_results:
+        return {}
+
+    # Shortlist = top 20% of ranked candidates (minimum 1)
+    n_shortlisted = max(1, round(len(job_results) * SHORTLIST_TOP_PCT))
+    shortlisted_ids = {mr.candidate_id for mr in job_results[:n_shortlisted]}
 
     groups: dict[str, dict] = {}
     for mr in job_results:
@@ -27,7 +39,7 @@ def compute_fairness_report(job_id: int, protected_attribute: str) -> dict:
             groups[group_val] = {"total": 0, "shortlisted": 0, "scores": []}
         groups[group_val]["total"] += 1
         groups[group_val]["scores"].append(mr.overall_score)
-        if mr.overall_score >= SHORTLIST_SCORE_THRESHOLD:
+        if mr.candidate_id in shortlisted_ids:
             groups[group_val]["shortlisted"] += 1
 
     subgroup_data = {}
