@@ -1,7 +1,7 @@
 import { NavLink, Link } from 'react-router-dom'
 import {
   LayoutDashboard, Briefcase, Users, GitMerge,
-  BarChart3, LogOut,
+  BarChart3, LogOut, X,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import LogoIcon from './LogoIcon'
@@ -14,20 +14,27 @@ const nav = [
   { to: '/fairness',   icon: BarChart3,       label: 'Fairness' },
 ]
 
-export default function Sidebar() {
+export default function Sidebar({ onClose }) {
   const { user, logout } = useAuth()
 
   return (
-    <aside className="w-60 flex-shrink-0 bg-surface-800 border-r border-surface-400 flex flex-col h-screen sticky top-0">
+    <aside className="w-60 flex-shrink-0 bg-surface-800 border-r border-surface-400 flex flex-col h-screen">
       {/* Logo */}
-      <div className="px-5 py-5 border-b border-surface-400">
-        <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+      <div className="px-5 py-5 border-b border-surface-400 flex items-center justify-between">
+        <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity" onClick={onClose}>
           <LogoIcon size={36} />
           <div>
             <p className="font-bold text-white text-sm leading-tight">HiringAI</p>
             <p className="text-xs text-gray-500">Intelligence Platform</p>
           </div>
         </Link>
+        {/* Close button — only visible on mobile */}
+        <button
+          onClick={onClose}
+          className="md:hidden text-gray-500 hover:text-white transition-colors p-1"
+        >
+          <X className="w-4 h-4" />
+        </button>
       </div>
 
       {/* Nav */}
@@ -37,6 +44,7 @@ export default function Sidebar() {
             key={to}
             to={to}
             end={to === '/'}
+            onClick={onClose}
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
                 isActive

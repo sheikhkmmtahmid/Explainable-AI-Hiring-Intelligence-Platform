@@ -58,15 +58,16 @@ export default function MatchResults() {
   if (loading) return <LoadingSpinner size="lg" className="min-h-[60vh]" />
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-5 animate-fade-in">
       <Link to={`/jobs/${jobId}`} className="btn-ghost text-sm inline-flex"><ArrowLeft className="w-4 h-4" /> Back to Job</Link>
 
-      <div className="flex items-center justify-between">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="page-title">Match Results</h1>
           <p className="text-gray-500 text-sm mt-1">{job?.title} · {matches.length} candidates ranked</p>
         </div>
-        <div className="flex gap-2 items-center">
+        <div className="flex flex-wrap gap-2 items-center">
           {selected.length > 0 && (
             <span className="text-xs text-gray-400">{selected.length}/2 selected</span>
           )}
@@ -79,19 +80,19 @@ export default function MatchResults() {
           </button>
           <button onClick={refresh} className="btn-secondary text-sm"><RefreshCw className="w-4 h-4" /></button>
           <button onClick={handleTrigger} disabled={triggering} className="btn-primary text-sm">
-            <Zap className="w-4 h-4" /> {triggering ? 'Queuing…' : 'Re-run Matching'}
+            <Zap className="w-4 h-4" /> {triggering ? 'Queuing…' : 'Re-run'}
           </button>
         </div>
       </div>
 
       {selected.length > 0 && (
-        <div className="rounded-xl border border-scarlet-500/30 bg-scarlet-500/5 px-4 py-2.5 text-sm text-scarlet-300 flex items-center justify-between">
+        <div className="rounded-xl border border-scarlet-500/30 bg-scarlet-500/5 px-4 py-2.5 text-sm text-scarlet-300 flex items-center justify-between gap-2">
           <span>
             {selected.length === 1
               ? 'Select one more candidate to compare.'
               : 'Two candidates selected. Click Compare to see them side by side.'}
           </span>
-          <button onClick={() => setSelected([])} className="text-xs text-gray-500 hover:text-gray-300 transition-colors">Clear</button>
+          <button onClick={() => setSelected([])} className="text-xs text-gray-500 hover:text-gray-300 transition-colors flex-shrink-0">Clear</button>
         </div>
       )}
 
@@ -101,14 +102,13 @@ export default function MatchResults() {
         </div>
       ) : (
         <div className="card overflow-hidden">
-          <div className="grid grid-cols-12 gap-4 px-5 py-3 border-b border-surface-400 text-xs font-medium text-gray-500 uppercase tracking-wide">
-            <div className="col-span-1 flex items-center gap-2">
-              <span className="w-4" />#
-            </div>
+          {/* Desktop header row — hidden on mobile */}
+          <div className="hidden sm:grid sm:grid-cols-12 gap-4 px-5 py-3 border-b border-surface-400 text-xs font-medium text-gray-500 uppercase tracking-wide">
+            <div className="col-span-1">#</div>
             <div className="col-span-3">Candidate</div>
             <div className="col-span-2">Overall</div>
             <div className="col-span-5">Score Breakdown</div>
-            <div className="col-span-1"></div>
+            <div className="col-span-1" />
           </div>
 
           <div className="divide-y divide-surface-400">
@@ -119,35 +119,68 @@ export default function MatchResults() {
               return (
                 <div
                   key={m.id}
-                  className={`grid grid-cols-12 gap-4 px-5 py-4 items-center transition-colors ${isSelected ? 'bg-scarlet-500/8 border-l-2 border-scarlet-500' : 'hover:bg-surface-600'}`}
+                  className={`px-4 sm:px-5 py-4 transition-colors ${isSelected ? 'bg-scarlet-500/8 border-l-2 border-scarlet-500' : 'hover:bg-surface-600'}`}
                 >
-                  <div className="col-span-1 flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => toggleSelect(m.id)}
-                      className="w-3.5 h-3.5 rounded accent-scarlet-500 cursor-pointer flex-shrink-0"
-                    />
-                    <span className="text-sm font-medium text-gray-500">{i + 1}</span>
+                  {/* Mobile layout */}
+                  <div className="sm:hidden">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelect(m.id)}
+                          className="w-3.5 h-3.5 rounded accent-scarlet-500 cursor-pointer flex-shrink-0"
+                        />
+                        <span className="text-xs text-gray-500 flex-shrink-0">{i + 1}.</span>
+                        <Link to={`/candidates/${m.candidate}`} className="text-sm font-medium text-white hover:text-scarlet-400 transition-colors truncate">
+                          {m.candidate_name}
+                        </Link>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className={`text-lg font-bold ${scoreColor}`}>{(score * 100).toFixed(0)}%</span>
+                        <Link to={`/matching/${jobId}/explain/${m.id}`} className="btn-ghost text-xs py-1 px-2">
+                          <BarChart3 className="w-3.5 h-3.5" />
+                        </Link>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <ScoreBar label="Semantic"   value={m.semantic_score}      color="scarlet" />
+                      <ScoreBar label="Skills"     value={m.skill_overlap_score} color="gold" />
+                      <ScoreBar label="Experience" value={m.experience_score}    color="blue" />
+                      <ScoreBar label="Education"  value={m.education_score}     color="purple" />
+                    </div>
                   </div>
-                  <div className="col-span-3">
-                    <Link to={`/candidates/${m.candidate}`} className="text-sm font-medium text-white hover:text-scarlet-400 transition-colors">
-                      {m.candidate_name}
-                    </Link>
-                  </div>
-                  <div className="col-span-2">
-                    <span className={`text-xl font-bold ${scoreColor}`}>{(score * 100).toFixed(0)}%</span>
-                  </div>
-                  <div className="col-span-5 space-y-1.5">
-                    <ScoreBar label="Semantic"    value={m.semantic_score}      color="scarlet" />
-                    <ScoreBar label="Skills"      value={m.skill_overlap_score} color="gold" />
-                    <ScoreBar label="Experience"  value={m.experience_score}    color="blue" />
-                    <ScoreBar label="Education"   value={m.education_score}     color="purple" />
-                  </div>
-                  <div className="col-span-1 flex justify-end">
-                    <Link to={`/matching/${jobId}/explain/${m.id}`} className="btn-ghost text-xs py-1 px-2">
-                      <BarChart3 className="w-3.5 h-3.5" />
-                    </Link>
+
+                  {/* Desktop layout */}
+                  <div className="hidden sm:grid sm:grid-cols-12 gap-4 items-center">
+                    <div className="col-span-1 flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleSelect(m.id)}
+                        className="w-3.5 h-3.5 rounded accent-scarlet-500 cursor-pointer flex-shrink-0"
+                      />
+                      <span className="text-sm font-medium text-gray-500">{i + 1}</span>
+                    </div>
+                    <div className="col-span-3">
+                      <Link to={`/candidates/${m.candidate}`} className="text-sm font-medium text-white hover:text-scarlet-400 transition-colors">
+                        {m.candidate_name}
+                      </Link>
+                    </div>
+                    <div className="col-span-2">
+                      <span className={`text-xl font-bold ${scoreColor}`}>{(score * 100).toFixed(0)}%</span>
+                    </div>
+                    <div className="col-span-5 space-y-1.5">
+                      <ScoreBar label="Semantic"   value={m.semantic_score}      color="scarlet" />
+                      <ScoreBar label="Skills"     value={m.skill_overlap_score} color="gold" />
+                      <ScoreBar label="Experience" value={m.experience_score}    color="blue" />
+                      <ScoreBar label="Education"  value={m.education_score}     color="purple" />
+                    </div>
+                    <div className="col-span-1 flex justify-end">
+                      <Link to={`/matching/${jobId}/explain/${m.id}`} className="btn-ghost text-xs py-1 px-2">
+                        <BarChart3 className="w-3.5 h-3.5" />
+                      </Link>
+                    </div>
                   </div>
                 </div>
               )

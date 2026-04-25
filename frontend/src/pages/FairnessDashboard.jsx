@@ -76,20 +76,20 @@ export default function FairnessDashboard() {
 
       {/* Controls */}
       <div className="card p-5">
-        <div className="flex flex-wrap items-end gap-4">
-          <div className="flex-1 min-w-48">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-3">
+          <div className="flex-1 min-w-0 sm:min-w-48">
             <label className="label">Job Position</label>
             <select className="input" value={selectedJob} onChange={e => setSelectedJob(e.target.value)}>
               {jobs.map(j => <option key={j.id} value={j.id}>{j.title} — {j.company}</option>)}
             </select>
           </div>
-          <div>
+          <div className="sm:w-44">
             <label className="label">Protected Attribute</label>
             <select className="input" value={attribute} onChange={e => setAttribute(e.target.value)}>
               {ATTRIBUTES.map(a => <option key={a} value={a}>{a.replace('_', ' ')}</option>)}
             </select>
           </div>
-          <button onClick={generate} disabled={generating || !selectedJob} className="btn-primary">
+          <button onClick={generate} disabled={generating || !selectedJob} className="btn-primary w-full sm:w-auto">
             <RefreshCw className="w-4 h-4" /> {generating ? 'Analyzing…' : 'Run Analysis'}
           </button>
         </div>
@@ -160,8 +160,8 @@ export default function FairnessDashboard() {
               <div className="px-5 py-4 border-b border-surface-400">
                 <h2 className="section-title">Subgroup Breakdown</h2>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+              <div className="overflow-x-auto -mx-px">
+                <table className="w-full text-sm min-w-[520px]">
                   <thead>
                     <tr className="border-b border-surface-400">
                       {['Group', 'Total', 'Selected', 'Selection Rate', 'Disparate Impact', 'Status'].map(h => (

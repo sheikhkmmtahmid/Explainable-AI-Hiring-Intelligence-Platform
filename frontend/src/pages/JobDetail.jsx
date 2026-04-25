@@ -145,7 +145,7 @@ export default function JobDetail() {
       {/* ── EDIT MODE ── */}
       {editing ? (
         <>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <h1 className="page-title">Edit Job</h1>
             <div className="flex gap-2">
               <button onClick={cancelEdit} className="btn-ghost text-sm"><X className="w-4 h-4" /> Cancel</button>
@@ -157,8 +157,8 @@ export default function JobDetail() {
 
           <div className="card p-5 space-y-4">
             <h2 className="section-title">Job Details</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <INP label="Job Title" name="title" form={form} onChange={onChange} required className="col-span-2" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <INP label="Job Title" name="title" form={form} onChange={onChange} required className="sm:col-span-2" />
               <INP label="Company"  name="company" form={form} onChange={onChange} required />
               <INP label="Industry" name="industry" form={form} onChange={onChange} />
             </div>
@@ -182,12 +182,12 @@ export default function JobDetail() {
 
           <div className="card p-5 space-y-4">
             <h2 className="section-title">Location & Type</h2>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <INP label="City"   name="city"    form={form} onChange={onChange} />
               <INP label="Region" name="region"  form={form} onChange={onChange} />
               <INP label="Country" name="country" form={form} onChange={onChange} />
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <SEL label="Work Model" name="work_model" form={form} onChange={onChange}>
                 <option value="onsite">On-site</option>
                 <option value="remote">Remote</option>
@@ -211,7 +211,7 @@ export default function JobDetail() {
 
           <div className="card p-5 space-y-4">
             <h2 className="section-title">Compensation & Status</h2>
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <INP label="Min Salary" name="salary_min" form={form} onChange={onChange} type="number" />
               <INP label="Max Salary" name="salary_max" form={form} onChange={onChange} type="number" />
               <SEL label="Currency" name="salary_currency" form={form} onChange={onChange}>
@@ -231,15 +231,15 @@ export default function JobDetail() {
       <>
         {/* Header */}
         <div className="card p-6">
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
             <div className="flex items-start gap-4">
               <div className="w-12 h-12 rounded-xl bg-surface-500 flex items-center justify-center flex-shrink-0">
                 <Briefcase className="w-6 h-6 text-gray-400" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <h1 className="text-xl font-bold text-white">{job.title}</h1>
                 <p className="text-gray-400 mt-0.5">{job.company}</p>
-                <div className="flex items-center flex-wrap gap-3 mt-2">
+                <div className="flex items-center flex-wrap gap-2 mt-2">
                   {(job.city || job.country) && (
                     <span className="flex items-center gap-1 text-xs text-gray-500">
                       <MapPin className="w-3 h-3" /> {[job.city, job.country].filter(Boolean).join(', ')}
@@ -259,7 +259,7 @@ export default function JobDetail() {
                 </div>
               </div>
             </div>
-            <div className="flex gap-2 flex-shrink-0">
+            <div className="flex flex-wrap gap-2 flex-shrink-0">
               <button onClick={fetchMatches} className="btn-secondary text-sm"><RefreshCw className="w-4 h-4" /></button>
               <button onClick={handleTrigger} disabled={triggering} className="btn-primary text-sm">
                 <Zap className="w-4 h-4" /> {triggering ? 'Queuing…' : 'Run Matching'}
