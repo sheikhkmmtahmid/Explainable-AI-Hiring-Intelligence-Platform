@@ -4,7 +4,7 @@ from decouple import config
 
 DEBUG = False
 
-ALLOWED_HOSTS = config("DJANGO_ALLOWED_HOSTS", default="*", cast=Csv())
+ALLOWED_HOSTS = ["*"]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -27,6 +27,9 @@ DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
 
 # CORS — allow HF space domain
 CORS_ALLOW_ALL_ORIGINS = True
+
+# Allow HF Spaces to embed the app in an iframe
+X_FRAME_OPTIONS = "ALLOWALL"
 
 # Upstash Redis requires SSL cert config for rediss:// scheme
 CELERY_BROKER_USE_SSL = {"ssl_cert_reqs": ssl.CERT_NONE}
