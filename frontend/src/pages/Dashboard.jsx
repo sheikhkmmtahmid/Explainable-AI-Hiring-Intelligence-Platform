@@ -5,24 +5,34 @@ import StatCard from '../components/StatCard'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { getJobs } from '../api/jobs'
 import { getCandidates } from '../api/candidates'
+import client from '../api/client'
 
 export default function Dashboard() {
   const [jobs, setJobs] = useState([])
   const [candidates, setCandidates] = useState([])
+  const [summary, setSummary] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    Promise.all([getJobs({ page_size: 5, ordering: '-posted_at' }), getCandidates({ page_size: 5 })])
-      .then(([j, c]) => {
+    Promise.all([
+      getJobs({ page_size: 5, ordering: '-posted_at' }),
+      getCandidates({ page_size: 5 }),
+      client.get('/analytics/summary/').catch(() => null),
+    ])
+      .then(([j, c, s]) => {
         setJobs(j.data.results ?? j.data)
         setCandidates(c.data.results ?? c.data)
+        if (s) setSummary(s.data)
       })
       .finally(() => setLoading(false))
   }, [])
 
   if (loading) return <LoadingSpinner size="lg" className="min-h-[60vh]" />
 
-  const activeJobs = jobs.filter(j => j.status === 'active').length
+  const totalJobs = summary?.total_jobs ?? jobs.length
+  const activeJobs = summary?.active_jobs ?? jobs.filter(j => j.status === 'active').length
+  const totalCandidates = summary?.total_candidates ?? candidates.length
+  const totalMatches = summary?.total_matches ?? 0
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -34,10 +44,10 @@ export default function Dashboard() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={Briefcase}   label="Total Jobs"      value={jobs.length}       sub={`${activeJobs} active`} accent />
-        <StatCard icon={Users}       label="Candidates"      value={candidates.length} sub="in database" />
-        <StatCard icon={GitMerge}    label="Matches Run"     value="—"                 sub="across all jobs" />
-        <StatCard icon={TrendingUp}  label="Avg Match Score" value="—"                 sub="overall" />
+        <StatCard icon={Briefcase}   label="Total Jobs"      value={totalJobs.toLocaleString()}       sub={`${activeJobs.toLocaleString()} active`} accent />
+        <StatCard icon={Users}       label="Candidates"      value={totalCandidates.toLocaleString()} sub="in database" />
+        <StatCard icon={GitMerge}    label="Matches Run"     value={totalMatches.toLocaleString()}    sub="across all jobs" />
+        <StatCard icon={TrendingUp}  label="Avg Match Score" value="—"                                sub="overall" />
       </div>
 
       {/* Recent Jobs */}
