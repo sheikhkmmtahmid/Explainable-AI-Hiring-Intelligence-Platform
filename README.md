@@ -1,3 +1,13 @@
+---
+title: HiringAI Platform
+emoji: 💼
+colorFrom: red
+colorTo: gray
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # Explainable AI Hiring Intelligence Platform
 
 **An Explainable and Fair NLP-Based Candidate–Job Matching Framework Using Django and Multi-Source Recruitment Data**
