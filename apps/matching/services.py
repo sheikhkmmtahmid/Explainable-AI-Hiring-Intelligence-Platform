@@ -166,33 +166,79 @@ def match_candidate_to_job(candidate, job) -> dict:
 
 def run_batch_matching_for_job(job_id: int) -> int:
     """Match all candidates with embeddings against a job."""
+    import numpy as np
+    from django.utils import timezone
     from apps.jobs.models import JobPost
     from apps.candidates.models import Candidate
     from .models import MatchResult, MatchBatchRun
 
     job = JobPost.objects.get(id=job_id)
-    batch = MatchBatchRun.objects.create(job=job, status="running")
+    batch = MatchBatchRun.objects.create(job=job, status="running", started_at=timezone.now())
 
-    from django.utils import timezone
-    batch.started_at = timezone.now()
-    batch.save(update_fields=["started_at"])
+    # Pre-load job vector and skills once
+    try:
+        j_vec = np.array(job.embedding.vector, dtype=np.float32)
+    except Exception:
+        j_vec = None
+        logger.warning("No embedding for job=%s", job_id)
 
-    candidates = Candidate.objects.filter(embedding__isnull=False)
+    job_skills = list(job.skill_requirements.values_list("skill_name", flat=True))
+    exp_req_field = (
+        job.skill_requirements.filter(is_required=True)
+        .values_list("min_years", flat=True)
+        .first()
+    )
+    job_exp_required = float(exp_req_field) if exp_req_field else None
+
+    # Load all candidates + their embeddings + skills in 2 queries
+    candidates = list(
+        Candidate.objects.filter(embedding__isnull=False)
+        .select_related("embedding")
+        .prefetch_related("skills")
+    )
+
     results = []
     for candidate in candidates:
-        scores = match_candidate_to_job(candidate, job)
-        results.append(MatchResult(candidate=candidate, job=job, **scores))
+        # Semantic: dot product of pre-normalised vectors
+        if j_vec is not None:
+            try:
+                c_vec = np.array(candidate.embedding.vector, dtype=np.float32)
+                semantic = float(np.dot(j_vec, c_vec))
+            except Exception:
+                semantic = 0.0
+        else:
+            semantic = 0.0
 
-    MatchResult.objects.bulk_create(results, update_conflicts=True,
-        update_fields=["overall_score", "semantic_score", "skill_overlap_score",
-                       "experience_score", "education_score", "computed_at"],
-        unique_fields=["candidate", "job"])
+        candidate_skills = [s.skill_name for s in candidate.skills.all()]
+        skill = compute_skill_overlap_score(candidate_skills, job_skills)
+        experience = compute_experience_score(float(candidate.years_of_experience or 0), job_exp_required)
+        education = compute_education_score(candidate.highest_education or "", "bachelor")
+        overall = compute_hybrid_score(semantic, skill, experience, education)
 
-    # Assign ranks
-    for rank, mr in enumerate(
-        MatchResult.objects.filter(job=job).order_by("-overall_score"), start=1
-    ):
-        MatchResult.objects.filter(pk=mr.pk).update(rank=rank)
+        results.append(MatchResult(
+            candidate=candidate,
+            job=job,
+            overall_score=round(overall, 4),
+            semantic_score=round(semantic, 4),
+            skill_overlap_score=round(skill, 4),
+            experience_score=round(experience, 4),
+            education_score=round(education, 4),
+        ))
+
+    # Delete stale results; MySQL/TiDB lacks update_conflicts+unique_fields support
+    MatchResult.objects.filter(job=job).delete()
+    MatchResult.objects.bulk_create(results, batch_size=500)
+
+    # Assign ranks via bulk_update (one UPDATE per candidate, batched)
+    sorted_results = sorted(results, key=lambda r: r.overall_score, reverse=True)
+    # Re-fetch PKs (bulk_create sets them after insert)
+    pk_map = {r.candidate_id: r.pk for r in MatchResult.objects.filter(job=job).only("candidate_id")}
+    for rank, mr in enumerate(sorted_results, start=1):
+        mr.rank = rank
+        mr.pk = pk_map.get(mr.candidate_id)
+    MatchResult.objects.bulk_update(
+        [r for r in sorted_results if r.pk], ["rank"], batch_size=500
+    )
 
     batch.status = "done"
     batch.candidates_processed = len(results)
