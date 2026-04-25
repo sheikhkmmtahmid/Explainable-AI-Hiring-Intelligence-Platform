@@ -12,6 +12,8 @@ export default function Login() {
   const [showPass, setShowPass] = useState(false)
   const [loading, setLoading] = useState(false)
 
+  const fillDemo = () => setForm({ username: 'admin', password: 'admin1234' })
+
   const submit = async (e) => {
     e.preventDefault()
     setLoading(true)
@@ -40,6 +42,26 @@ export default function Login() {
           </div>
           <h1 className="text-2xl font-bold text-white">HiringAI</h1>
           <p className="text-sm text-gray-500 mt-1">Explainable Hiring Intelligence Platform</p>
+        </div>
+
+        {/* Demo credentials banner */}
+        <div className="mb-4 rounded-lg border border-scarlet-500/30 bg-scarlet-500/10 px-4 py-3 text-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-gray-300 leading-snug">
+              <span className="font-medium text-white">Demo access</span>
+              <br />
+              <span className="text-gray-400">username: </span><span className="font-mono text-scarlet-300">admin</span>
+              {'  ·  '}
+              <span className="text-gray-400">password: </span><span className="font-mono text-scarlet-300">admin1234</span>
+            </div>
+            <button
+              type="button"
+              onClick={fillDemo}
+              className="flex-shrink-0 rounded-md bg-scarlet-600 hover:bg-scarlet-500 px-3 py-1.5 text-xs font-medium text-white transition-colors"
+            >
+              Fill in
+            </button>
+          </div>
         </div>
 
         {/* Card */}
