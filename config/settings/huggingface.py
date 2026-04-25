@@ -1,3 +1,4 @@
+import ssl
 from .base import *  # noqa
 from decouple import config
 
@@ -26,3 +27,21 @@ DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
 
 # CORS — allow HF space domain
 CORS_ALLOW_ALL_ORIGINS = True
+
+# Upstash Redis requires SSL cert config for rediss:// scheme
+CELERY_BROKER_USE_SSL = {"ssl_cert_reqs": ssl.CERT_NONE}
+CELERY_REDIS_BACKEND_USE_SSL = {"ssl_cert_reqs": ssl.CERT_NONE}
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": config("REDIS_URL", default="redis://localhost:6379/0"),
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            "CONNECTION_POOL_KWARGS": {"ssl_cert_reqs": ssl.CERT_NONE},
+        },
+        "TIMEOUT": 300,
+    }
+}
+
+# Serve React SPA index.html from staticfiles
+TEMPLATES[0]["DIRS"] = [BASE_DIR / "staticfiles"]
