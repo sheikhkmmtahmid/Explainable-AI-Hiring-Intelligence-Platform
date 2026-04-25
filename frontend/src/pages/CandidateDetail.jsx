@@ -188,7 +188,7 @@ export default function CandidateDetail() {
       {/* ── EDIT MODE ── */}
       {editing ? (
         <>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <h1 className="page-title">Edit Candidate</h1>
             <div className="flex gap-2">
               <button onClick={cancelEdit} className="btn-ghost text-sm"><X className="w-4 h-4" /> Cancel</button>
@@ -201,7 +201,7 @@ export default function CandidateDetail() {
           {/* Personal */}
           <div className="card p-5 space-y-4">
             <h2 className="section-title">Personal Information</h2>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Full Name *">
                 <input className="input" name="full_name" value={form.full_name} onChange={onChange} required />
               </Field>
@@ -228,8 +228,8 @@ export default function CandidateDetail() {
           {/* Professional */}
           <div className="card p-5 space-y-4">
             <h2 className="section-title">Professional Profile</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="sm:col-span-2">
                 <Field label="Current Title">
                   <input className="input" name="current_title" value={form.current_title} onChange={onChange} placeholder="e.g. Senior Data Scientist" />
                 </Field>
