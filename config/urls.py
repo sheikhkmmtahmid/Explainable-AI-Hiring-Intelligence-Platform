@@ -16,6 +16,7 @@ api_v1_patterns = [
     path("analytics/", include("apps.analytics.urls")),
     path("taxonomy/", include("apps.taxonomy.urls")),
     path("synthetic/", include("apps.synthetic_data.urls")),
+    path("tasks/", include("apps.tasks.urls")),
 ]
 
 urlpatterns = [

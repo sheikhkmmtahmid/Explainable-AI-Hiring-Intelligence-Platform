@@ -40,6 +40,7 @@ LOCAL_APPS = [
     "apps.synthetic_data",
     "apps.taxonomy",
     "apps.analytics",
+    "apps.tasks",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS

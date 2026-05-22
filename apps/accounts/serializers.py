@@ -42,3 +42,36 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         data = super().validate(attrs)
         data["user"] = UserSerializer(self.user).data
         return data
+
+
+class AdminCreateUserSerializer(serializers.ModelSerializer):
+    """Admin can create users of any role."""
+    password = serializers.CharField(write_only=True, validators=[validate_password])
+
+    class Meta:
+        model = User
+        fields = ["id", "email", "username", "password", "role", "organisation", "phone", "country"]
+        extra_kwargs = {"email": {"required": True}, "role": {"required": True}}
+
+    def create(self, validated_data):
+        return User.objects.create_user(**validated_data)
+
+
+class ManagerCreateUserSerializer(serializers.ModelSerializer):
+    """Manager (recruiter) can create recruiter or candidate users only."""
+    password = serializers.CharField(write_only=True, validators=[validate_password])
+
+    ALLOWED_ROLES = [User.Role.RECRUITER, User.Role.CANDIDATE]
+
+    class Meta:
+        model = User
+        fields = ["id", "email", "username", "password", "role", "organisation", "phone", "country"]
+        extra_kwargs = {"email": {"required": True}, "role": {"required": True}}
+
+    def validate_role(self, value):
+        if value not in self.ALLOWED_ROLES:
+            raise serializers.ValidationError("Managers can only create recruiter or candidate accounts.")
+        return value
+
+    def create(self, validated_data):
+        return User.objects.create_user(**validated_data)

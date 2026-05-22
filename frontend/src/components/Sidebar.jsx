@@ -1,7 +1,7 @@
 import { NavLink, Link } from 'react-router-dom'
 import {
   LayoutDashboard, Briefcase, Users, GitMerge,
-  BarChart3, LogOut, X,
+  BarChart3, LogOut, X, ClipboardList, UserPlus,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import LogoIcon from './LogoIcon'
@@ -12,10 +12,12 @@ const nav = [
   { to: '/candidates', icon: Users,           label: 'Candidates' },
   { to: '/matching',   icon: GitMerge,        label: 'Matching' },
   { to: '/fairness',   icon: BarChart3,       label: 'Fairness' },
+  { to: '/tasks',      icon: ClipboardList,   label: 'Tasks' },
 ]
 
 export default function Sidebar({ onClose }) {
   const { user, logout } = useAuth()
+  const isManager = user?.role === 'admin' || user?.role === 'recruiter'
 
   return (
     <aside className="w-60 flex-shrink-0 bg-surface-800 border-r border-surface-400 flex flex-col h-screen">
@@ -28,7 +30,7 @@ export default function Sidebar({ onClose }) {
             <p className="text-xs text-gray-500">Intelligence Platform</p>
           </div>
         </Link>
-        {/* Close button — only visible on mobile */}
+        {/* Close button — mobile only */}
         <button
           onClick={onClose}
           className="md:hidden text-gray-500 hover:text-white transition-colors p-1"
@@ -57,6 +59,27 @@ export default function Sidebar({ onClose }) {
             {label}
           </NavLink>
         ))}
+
+        {/* Task 10: "Create New User" button — only visible to admin and manager */}
+        {isManager && (
+          <>
+            <div className="my-2 border-t border-surface-400" />
+            <NavLink
+              to="/users/create"
+              onClick={onClose}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+                  isActive
+                    ? 'bg-scarlet-500/15 text-scarlet-400 border border-scarlet-500/20'
+                    : 'text-gray-400 hover:text-white hover:bg-surface-600'
+                }`
+              }
+            >
+              <UserPlus className="w-4 h-4 flex-shrink-0" />
+              Create New User
+            </NavLink>
+          </>
+        )}
       </nav>
 
       {/* User */}

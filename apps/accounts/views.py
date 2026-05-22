@@ -6,13 +6,24 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 
 from .models import User
-from .serializers import CustomTokenObtainPairSerializer, UserRegistrationSerializer, UserSerializer
+from .serializers import (
+    AdminCreateUserSerializer,
+    CustomTokenObtainPairSerializer,
+    ManagerCreateUserSerializer,
+    UserRegistrationSerializer,
+    UserSerializer,
+)
 
 
 class RegisterView(generics.CreateAPIView):
+    """Public registration — always creates a Candidate (employee) account."""
     queryset = User.objects.all()
     serializer_class = UserRegistrationSerializer
     permission_classes = [permissions.AllowAny]
+
+    def perform_create(self, serializer):
+        # Task 9: without authentication, new user gets default role = candidate (employee)
+        serializer.save(role=User.Role.CANDIDATE)
 
 
 class LoginView(TokenObtainPairView):
@@ -60,3 +71,39 @@ class ChangePasswordView(APIView):
         user.set_password(new_password)
         user.save()
         return Response({"detail": "Password updated successfully."})
+
+
+class CreateUserView(APIView):
+    """
+    Task 7 & 8: Admin can create admin/recruiter/candidate.
+    Manager (recruiter) can create recruiter/candidate only.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        actor = request.user
+        if actor.role == User.Role.ADMIN:
+            serializer = AdminCreateUserSerializer(data=request.data)
+        elif actor.role == User.Role.RECRUITER:
+            serializer = ManagerCreateUserSerializer(data=request.data)
+        else:
+            return Response(
+                {"detail": "You do not have permission to create users."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
+
+
+class UserListView(APIView):
+    """Admin and managers can list all users (for task assignment dropdowns)."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        if user.role not in (User.Role.ADMIN, User.Role.RECRUITER):
+            return Response({"detail": "Forbidden."}, status=status.HTTP_403_FORBIDDEN)
+        users = User.objects.all().order_by("username")
+        return Response(UserSerializer(users, many=True).data)
