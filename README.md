@@ -13,6 +13,7 @@ pinned: false
 **An Explainable and Fair NLP-Based Candidate–Job Matching Framework Using Django and Multi-Source Recruitment Data**
 
 > Made by [SKMMT](https://skmmt.rootexception.com/)
+> View [Demo](https://sheikhkmmtahmid-hiringai-platform.hf.space/)
 
 ---
 
