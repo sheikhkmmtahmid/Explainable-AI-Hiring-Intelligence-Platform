@@ -29,6 +29,7 @@ media/
 .vscode/
 .idea/
 *.swp
+.claude/
 
 # ML models cache
 .cache/
