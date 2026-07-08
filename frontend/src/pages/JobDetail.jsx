@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, MapPin, Briefcase, Zap, BarChart3, ChevronRight, RefreshCw, Pencil, Trash2, X, Check } from 'lucide-react'
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { ArrowLeft, MapPin, Briefcase, Zap, BarChart3, ChevronRight, RefreshCw, Pencil, Trash2, X, Check, ClipboardList, Users } from 'lucide-react'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ConfirmDialog from '../components/ConfirmDialog'
 import ScoreBar from '../components/ScoreBar'
-import { getJob, updateJob, deleteJob } from '../api/jobs'
+import { getJob, updateJob, deleteJob, setJobSkills, removeJobSkill } from '../api/jobs'
 import { triggerMatching, getTopCandidates } from '../api/matching'
+import { getApplications, updateApplicationStatus } from '../api/applications'
+import { STATUS_OPTIONS, STATUS_STYLES } from '../constants/applicationStatus'
+import SkillCombobox from '../components/SkillCombobox'
 import toast from 'react-hot-toast'
 
 const TextAsList = ({ text }) => {
@@ -39,21 +42,50 @@ const INP = ({ label, name, form, onChange, type = 'text', required = false, cla
 export default function JobDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const returnTo = searchParams.get('returnTo')
+  // Chain our own returnTo through, so a candidate opened from here can bounce
+  // all the way back to the Jobs tab this job was originally opened from.
+  const selfWithReturnTo = returnTo ? `/jobs/${id}?returnTo=${encodeURIComponent(returnTo)}` : `/jobs/${id}`
   const [job, setJob]               = useState(null)
   const [matches, setMatches]       = useState([])
+  const [applications, setApplications] = useState([])
   const [loadingJob, setLoadingJob] = useState(true)
   const [loadingMatches, setLoadingMatches] = useState(false)
+  const [loadingApplications, setLoadingApplications] = useState(true)
   const [triggering, setTriggering] = useState(false)
   const [editing, setEditing]       = useState(false)
   const [saving, setSaving]         = useState(false)
   const [form, setForm]             = useState({})
+  const [skills, setSkills]         = useState([])
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting]     = useState(false)
 
   useEffect(() => {
     getJob(id).then(({ data }) => setJob(data)).finally(() => setLoadingJob(false))
     fetchMatches()
+    fetchApplications()
   }, [id])
+
+  const fetchApplications = () => {
+    setLoadingApplications(true)
+    getApplications({ job: id, page_size: 100 })
+      .then(({ data }) => setApplications(data.results ?? data))
+      .catch(() => {})
+      .finally(() => setLoadingApplications(false))
+  }
+
+  const handleApplicantStatusChange = async (application, newStatus) => {
+    const prev = application.status
+    setApplications((list) => list.map((a) => (a.id === application.id ? { ...a, status: newStatus } : a)))
+    try {
+      await updateApplicationStatus(application.id, newStatus)
+      toast.success(`${application.candidate_name} marked as ${newStatus}`)
+    } catch {
+      toast.error('Failed to update status')
+      setApplications((list) => list.map((a) => (a.id === application.id ? { ...a, status: prev } : a)))
+    }
+  }
 
   const fetchMatches = () => {
     setLoadingMatches(true)
@@ -89,6 +121,7 @@ export default function JobDetail() {
       salary_currency:  job.salary_currency ?? 'USD',
       status:           job.status ?? 'active',
     })
+    setSkills((job.skill_requirements ?? []).map((s) => s.skill_name))
     setEditing(true)
   }
 
@@ -103,8 +136,17 @@ export default function JobDetail() {
         salary_min: form.salary_min !== '' ? Number(form.salary_min) : null,
         salary_max: form.salary_max !== '' ? Number(form.salary_max) : null,
       }
-      const { data } = await updateJob(id, payload)
-      setJob(data)
+      await updateJob(id, payload)
+
+      const existingNames = (job.skill_requirements ?? []).map((s) => s.skill_name.toLowerCase())
+      const nextNames = skills.map((s) => s.toLowerCase())
+      const added = skills.filter((s) => !existingNames.includes(s.toLowerCase()))
+      const removed = (job.skill_requirements ?? []).filter((s) => !nextNames.includes(s.skill_name.toLowerCase()))
+      if (added.length) await setJobSkills(id, added)
+      for (const s of removed) await removeJobSkill(id, s.skill_name)
+
+      const { data: refreshed } = await getJob(id)
+      setJob(refreshed)
       setEditing(false)
       toast.success('Job updated')
     } catch (err) {
@@ -126,6 +168,8 @@ export default function JobDetail() {
     setConfirmDelete(false)
   }
 
+  const appliedCandidateIds = new Set(applications.map((a) => a.candidate))
+
   if (loadingJob) return <LoadingSpinner size="lg" className="min-h-[60vh]" />
   if (!job) return <p className="text-gray-500">Job not found.</p>
 
@@ -140,7 +184,7 @@ export default function JobDetail() {
         onCancel={() => setConfirmDelete(false)}
       />
 
-      <Link to="/jobs" className="btn-ghost text-sm inline-flex"><ArrowLeft className="w-4 h-4" /> Back to Jobs</Link>
+      <Link to={returnTo || '/jobs'} className="btn-ghost text-sm inline-flex"><ArrowLeft className="w-4 h-4" /> Back to Jobs</Link>
 
       {/* ── EDIT MODE ── */}
       {editing ? (
@@ -167,8 +211,13 @@ export default function JobDetail() {
               <textarea name="description" rows={5} required className="input resize-none" value={form.description} onChange={onChange} />
             </div>
             <div>
+              <label className="label">Required Skills</label>
+              <p className="text-xs text-gray-500 mb-1">Search the skill library or add a new one. These drive candidate matching directly.</p>
+              <SkillCombobox value={skills} onChange={setSkills} />
+            </div>
+            <div>
               <label className="label">Requirements</label>
-              <p className="text-xs text-gray-500 mb-1">One requirement per line. Skills listed here are used for candidate matching.</p>
+              <p className="text-xs text-gray-500 mb-1">Optional free-text detail (one per line) — use Required Skills above for matching.</p>
               <textarea name="requirements" rows={5} className="input resize-none font-mono text-xs" value={form.requirements} onChange={onChange}
                 placeholder={"Python (3+ years)\nMachine learning with scikit-learn or XGBoost\nSQL and data pipeline experience\nFamiliarity with AWS or cloud platforms"} />
             </div>
@@ -260,6 +309,12 @@ export default function JobDetail() {
               </div>
             </div>
             <div className="flex flex-wrap gap-2 flex-shrink-0">
+              <Link
+                to={`/applications?job=${id}&job_title=${encodeURIComponent(job.title)}&job_company=${encodeURIComponent(job.company)}`}
+                className="btn-secondary text-sm"
+              >
+                <ClipboardList className="w-4 h-4" /> View Applications
+              </Link>
               <button onClick={fetchMatches} className="btn-secondary text-sm"><RefreshCw className="w-4 h-4" /></button>
               <button onClick={handleTrigger} disabled={triggering} className="btn-primary text-sm">
                 <Zap className="w-4 h-4" /> {triggering ? 'Queuing…' : 'Run Matching'}
@@ -281,6 +336,69 @@ export default function JobDetail() {
                   </span>
                 ))}
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* Applicants -- the real, ground-truth "who applied to THIS job"
+            list. Deliberately separate from "AI-Suggested Candidates" below,
+            which ranks the whole candidate pool by fit and includes people
+            who never applied here at all -- conflating the two is exactly
+            what makes a job's hiring activity hard to read at a glance. */}
+        <div className="card overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-surface-400">
+            <div>
+              <h2 className="section-title flex items-center gap-2"><Users className="w-4 h-4 text-gray-400" /> Applicants ({applications.length})</h2>
+              <p className="text-xs text-gray-500 mt-0.5">People who actually applied to this job — this is where CV submissions land, however they arrive (manual entry today, automatic intake once connected).</p>
+            </div>
+          </div>
+
+          {loadingApplications ? (
+            <LoadingSpinner className="py-12" />
+          ) : applications.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-500 text-sm">No one has applied to this job yet.</p>
+              <p className="text-gray-600 text-xs mt-1">The list below is AI-suggested candidates from your whole pool, not applicants.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-surface-400">
+              {applications.map((a) => (
+                <div key={a.id} className="px-5 py-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 hover:bg-surface-600 transition-colors">
+                  <Link
+                    to={`/candidates/${a.candidate}?returnTo=${encodeURIComponent(selfWithReturnTo)}`}
+                    className="text-sm font-medium text-white hover:text-scarlet-400 transition-colors sm:w-48 flex-shrink-0 truncate"
+                  >
+                    {a.candidate_name}
+                  </Link>
+                  <span className="text-xs text-gray-500 sm:w-32 flex-shrink-0">
+                    {a.applied_at ? new Date(a.applied_at).toLocaleDateString() : ''}
+                  </span>
+                  <span className="text-sm text-gray-300 sm:w-16 flex-shrink-0">
+                    {a.overall_match_score != null ? `${(a.overall_match_score * 100).toFixed(0)}%` : '—'}
+                  </span>
+                  <span className="sm:w-24 flex-shrink-0">
+                    {a.match_result_id != null ? (
+                      <Link to={`/matching/${id}/explain/${a.match_result_id}?returnTo=${encodeURIComponent(selfWithReturnTo)}`} className="btn-ghost text-xs py-1 px-2 inline-flex">
+                        <BarChart3 className="w-3 h-3" /> Explain
+                      </Link>
+                    ) : (
+                      <span className="text-xs text-gray-600" title="This candidate hasn't been scored against this job yet — run matching first.">Not scored</span>
+                    )}
+                  </span>
+                  <span className={`badge text-xs sm:w-28 flex-shrink-0 justify-center ${STATUS_STYLES[a.status] ?? 'bg-surface-500 text-gray-400'}`}>
+                    {a.status}
+                  </span>
+                  <select
+                    className="input text-xs py-1.5 sm:ml-auto sm:w-40"
+                    value={a.status}
+                    onChange={(e) => handleApplicantStatusChange(a, e.target.value)}
+                  >
+                    {STATUS_OPTIONS.filter((o) => o.value).map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -307,14 +425,18 @@ export default function JobDetail() {
           </div>
         </div>
 
-        {/* Top candidates */}
+        {/* AI-suggested candidates -- sourcing/discovery across the WHOLE
+            candidate pool, ranked by algorithmic fit. Most of these have
+            never applied to this job; that's the point (it's how you'd
+            find people worth reaching out to). See "Applicants" above for
+            who actually applied. */}
         <div className="card overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-surface-400">
             <div>
-              <h2 className="section-title">Top Matched Candidates</h2>
-              <p className="text-xs text-gray-500 mt-0.5">Ranked by overall match score</p>
+              <h2 className="section-title">AI-Suggested Candidates</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Ranked by fit across your whole candidate pool — most haven't applied to this job; use this to find people worth reaching out to.</p>
             </div>
-            <Link to={`/matching/${id}`} className="text-xs text-scarlet-400 hover:text-scarlet-300 flex items-center gap-1 font-medium">
+            <Link to={`/matching/${id}?returnTo=${encodeURIComponent(selfWithReturnTo)}`} className="text-xs text-scarlet-400 hover:text-scarlet-300 flex items-center gap-1 font-medium">
               Full report <ChevronRight className="w-3 h-3" />
             </Link>
           </div>
@@ -335,15 +457,18 @@ export default function JobDetail() {
                       <div className="w-7 h-7 rounded-full bg-scarlet-500/20 border border-scarlet-500/30 flex items-center justify-center text-xs font-bold text-scarlet-400 flex-shrink-0">
                         {i + 1}
                       </div>
-                      <Link to={`/candidates/${m.candidate}`} className="text-sm font-medium text-white hover:text-scarlet-400 transition-colors">
+                      <Link to={`/candidates/${m.candidate}?returnTo=${encodeURIComponent(selfWithReturnTo)}`} className="text-sm font-medium text-white hover:text-scarlet-400 transition-colors">
                         {m.candidate_name}
                       </Link>
+                      {appliedCandidateIds.has(m.candidate) && (
+                        <span className="badge text-xs bg-emerald-500/15 text-emerald-400">Applied</span>
+                      )}
                     </div>
                     <div className="flex items-center gap-3 flex-shrink-0">
                       <span className={`text-lg font-bold ${m.overall_score >= 0.7 ? 'text-emerald-400' : m.overall_score >= 0.4 ? 'text-gold-400' : 'text-scarlet-400'}`}>
                         {(m.overall_score * 100).toFixed(0)}%
                       </span>
-                      <Link to={`/matching/${id}/explain/${m.id}`} className="btn-ghost text-xs py-1 px-2">
+                      <Link to={`/matching/${id}/explain/${m.id}?returnTo=${encodeURIComponent(selfWithReturnTo)}`} className="btn-ghost text-xs py-1 px-2">
                         <BarChart3 className="w-3 h-3" /> Explain
                       </Link>
                     </div>

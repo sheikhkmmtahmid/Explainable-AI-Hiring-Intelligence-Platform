@@ -15,10 +15,14 @@ import MatchResults from './pages/MatchResults'
 import CandidateCompare from './pages/CandidateCompare'
 import ExplanationDetail from './pages/ExplanationDetail'
 import FairnessDashboard from './pages/FairnessDashboard'
+import ApplicationList from './pages/ApplicationList'
 import TaskList from './pages/TaskList'
 import TaskCreate from './pages/TaskCreate'
 import TaskDetail from './pages/TaskDetail'
 import CreateUser from './pages/CreateUser'
+import SkillModeration from './pages/SkillModeration'
+import Billing from './pages/Billing'
+import BillingModeration from './pages/BillingModeration'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -49,6 +53,7 @@ function AppRoutes() {
       <Route path="/matching/:jobId/compare/:matchIdA/:matchIdB" element={<ProtectedRoute><CandidateCompare /></ProtectedRoute>} />
       <Route path="/matching/:jobId/explain/:matchId" element={<ProtectedRoute><ExplanationDetail /></ProtectedRoute>} />
       <Route path="/fairness" element={<ProtectedRoute><FairnessDashboard /></ProtectedRoute>} />
+      <Route path="/applications" element={<ProtectedRoute><ApplicationList /></ProtectedRoute>} />
 
       {/* Tasks (session-10 feature) */}
       <Route path="/tasks"     element={<ProtectedRoute><TaskList /></ProtectedRoute>} />
@@ -57,6 +62,13 @@ function AppRoutes() {
 
       {/* User management — admin & manager only */}
       <Route path="/users/create" element={<ProtectedRoute><CreateUser /></ProtectedRoute>} />
+
+      {/* Skill taxonomy moderation — admin only */}
+      <Route path="/skills/moderation" element={<ProtectedRoute><SkillModeration /></ProtectedRoute>} />
+
+      {/* Billing — org admin manages their own subscription; platform staff reviews manual payments */}
+      <Route path="/billing" element={<ProtectedRoute><Billing /></ProtectedRoute>} />
+      <Route path="/billing/moderation" element={<ProtectedRoute><BillingModeration /></ProtectedRoute>} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

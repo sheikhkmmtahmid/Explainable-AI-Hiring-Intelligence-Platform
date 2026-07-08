@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Sparkles, AlertTriangle, CheckCircle2, RefreshCw } from 'lucide-react'
 import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, Tooltip } from 'recharts'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -9,6 +9,8 @@ import toast from 'react-hot-toast'
 
 export default function ExplanationDetail() {
   const { jobId, matchId } = useParams()
+  const [searchParams] = useSearchParams()
+  const returnTo = searchParams.get('returnTo') || `/matching/${jobId}`
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
@@ -59,7 +61,7 @@ export default function ExplanationDetail() {
 
   return (
     <div className="space-y-6 animate-fade-in max-w-4xl">
-      <Link to={`/matching/${jobId}`} className="btn-ghost text-sm inline-flex">
+      <Link to={returnTo} className="btn-ghost text-sm inline-flex">
         <ArrowLeft className="w-4 h-4" /> Back to Results
       </Link>
 

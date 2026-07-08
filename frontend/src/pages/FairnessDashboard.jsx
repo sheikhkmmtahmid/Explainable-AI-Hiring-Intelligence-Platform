@@ -105,6 +105,27 @@ export default function FairnessDashboard() {
         </div>
       ) : (
         <>
+          {activeReport.basis === 'ai_rank_provisional' ? (
+            <div className="card p-4 border-gold-500/30 bg-gold-500/5 flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-gold-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-gold-400">Provisional estimate — not yet based on real decisions</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  No candidates for this job have reached a shortlisted/interviewed/hired/rejected status yet, so this
+                  report estimates fairness from the AI's ranking alone. Once recruiters start making real decisions on
+                  applications, this will automatically switch to auditing those actual outcomes instead.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="card p-4 border-emerald-500/30 bg-emerald-500/5 flex items-start gap-3">
+              <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-emerald-400">
+                Based on actual recruiter decisions (shortlisted / interviewed / offered / hired vs. rejected) — this audits what really happened, not just the AI's ranking.
+              </p>
+            </div>
+          )}
+
           {/* Summary metric */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="card p-5 text-center">
