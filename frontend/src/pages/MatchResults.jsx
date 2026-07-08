@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Zap, BarChart3, RefreshCw, GitCompare } from 'lucide-react'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ScoreBar from '../components/ScoreBar'
@@ -10,6 +10,10 @@ import toast from 'react-hot-toast'
 export default function MatchResults() {
   const { jobId } = useParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const returnTo = searchParams.get('returnTo')
+  const jobReturnTo = returnTo || `/jobs/${jobId}`
+  const selfWithReturnTo = returnTo ? `/matching/${jobId}?returnTo=${encodeURIComponent(returnTo)}` : `/matching/${jobId}`
   const [job, setJob] = useState(null)
   const [matches, setMatches] = useState([])
   const [loading, setLoading] = useState(true)
@@ -52,14 +56,14 @@ export default function MatchResults() {
 
   const handleCompare = () => {
     if (selected.length === 2)
-      navigate(`/matching/${jobId}/compare/${selected[0]}/${selected[1]}`)
+      navigate(`/matching/${jobId}/compare/${selected[0]}/${selected[1]}?returnTo=${encodeURIComponent(selfWithReturnTo)}`)
   }
 
   if (loading) return <LoadingSpinner size="lg" className="min-h-[60vh]" />
 
   return (
     <div className="space-y-5 animate-fade-in">
-      <Link to={`/jobs/${jobId}`} className="btn-ghost text-sm inline-flex"><ArrowLeft className="w-4 h-4" /> Back to Job</Link>
+      <Link to={jobReturnTo} className="btn-ghost text-sm inline-flex"><ArrowLeft className="w-4 h-4" /> Back to Job</Link>
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -132,13 +136,13 @@ export default function MatchResults() {
                           className="w-3.5 h-3.5 rounded accent-scarlet-500 cursor-pointer flex-shrink-0"
                         />
                         <span className="text-xs text-gray-500 flex-shrink-0">{i + 1}.</span>
-                        <Link to={`/candidates/${m.candidate}`} className="text-sm font-medium text-white hover:text-scarlet-400 transition-colors truncate">
+                        <Link to={`/candidates/${m.candidate}?returnTo=${encodeURIComponent(selfWithReturnTo)}`} className="text-sm font-medium text-white hover:text-scarlet-400 transition-colors truncate">
                           {m.candidate_name}
                         </Link>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         <span className={`text-lg font-bold ${scoreColor}`}>{(score * 100).toFixed(0)}%</span>
-                        <Link to={`/matching/${jobId}/explain/${m.id}`} className="btn-ghost text-xs py-1 px-2">
+                        <Link to={`/matching/${jobId}/explain/${m.id}?returnTo=${encodeURIComponent(selfWithReturnTo)}`} className="btn-ghost text-xs py-1 px-2">
                           <BarChart3 className="w-3.5 h-3.5" />
                         </Link>
                       </div>
@@ -163,7 +167,7 @@ export default function MatchResults() {
                       <span className="text-sm font-medium text-gray-500">{i + 1}</span>
                     </div>
                     <div className="col-span-3">
-                      <Link to={`/candidates/${m.candidate}`} className="text-sm font-medium text-white hover:text-scarlet-400 transition-colors">
+                      <Link to={`/candidates/${m.candidate}?returnTo=${encodeURIComponent(selfWithReturnTo)}`} className="text-sm font-medium text-white hover:text-scarlet-400 transition-colors">
                         {m.candidate_name}
                       </Link>
                     </div>
@@ -177,7 +181,7 @@ export default function MatchResults() {
                       <ScoreBar label="Education"  value={m.education_score}     color="purple" />
                     </div>
                     <div className="col-span-1 flex justify-end">
-                      <Link to={`/matching/${jobId}/explain/${m.id}`} className="btn-ghost text-xs py-1 px-2">
+                      <Link to={`/matching/${jobId}/explain/${m.id}?returnTo=${encodeURIComponent(selfWithReturnTo)}`} className="btn-ghost text-xs py-1 px-2">
                         <BarChart3 className="w-3.5 h-3.5" />
                       </Link>
                     </div>

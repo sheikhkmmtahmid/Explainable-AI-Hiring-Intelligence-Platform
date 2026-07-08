@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, BarChart3, CheckCircle2, AlertTriangle, Trophy } from 'lucide-react'
 import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, Tooltip, Legend } from 'recharts'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -53,6 +53,8 @@ function SkillTags({ skills, variant }) {
 
 export default function CandidateCompare() {
   const { jobId, matchIdA, matchIdB } = useParams()
+  const [searchParams] = useSearchParams()
+  const returnTo = searchParams.get('returnTo') || `/matching/${jobId}`
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState(null)
 
@@ -103,7 +105,7 @@ export default function CandidateCompare() {
 
   return (
     <div className="space-y-6 animate-fade-in max-w-5xl">
-      <Link to={`/matching/${jobId}`} className="btn-ghost text-sm inline-flex">
+      <Link to={returnTo} className="btn-ghost text-sm inline-flex">
         <ArrowLeft className="w-4 h-4" /> Back to Results
       </Link>
 
@@ -130,7 +132,7 @@ export default function CandidateCompare() {
                   {c.full_name?.[0] ?? '?'}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <Link to={`/candidates/${c.id}`} className="font-semibold text-white hover:text-scarlet-400 transition-colors">
+                  <Link to={`/candidates/${c.id}?returnTo=${encodeURIComponent(`/matching/${jobId}/compare/${matchIdA}/${matchIdB}?returnTo=${encodeURIComponent(returnTo)}`)}`} className="font-semibold text-white hover:text-scarlet-400 transition-colors">
                     {c.full_name}
                   </Link>
                   <p className="text-sm text-gray-400 mt-0.5">{c.current_title || '—'}</p>

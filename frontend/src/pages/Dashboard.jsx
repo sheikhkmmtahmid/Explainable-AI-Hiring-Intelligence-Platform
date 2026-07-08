@@ -62,7 +62,7 @@ export default function Dashboard() {
           {jobs.slice(0, 5).map(job => (
             <Link
               key={job.id}
-              to={`/jobs/${job.id}`}
+              to={`/jobs/${job.id}?returnTo=${encodeURIComponent('/')}`}
               className="flex items-center justify-between px-5 py-3.5 hover:bg-surface-600 transition-colors group"
             >
               <div className="min-w-0">
@@ -94,7 +94,7 @@ export default function Dashboard() {
           {candidates.slice(0, 5).map(c => (
             <Link
               key={c.id}
-              to={`/candidates/${c.id}`}
+              to={`/candidates/${c.id}?returnTo=${encodeURIComponent('/')}`}
               className="flex items-center justify-between px-5 py-3.5 hover:bg-surface-600 transition-colors group"
             >
               <div className="flex items-center gap-3 min-w-0">

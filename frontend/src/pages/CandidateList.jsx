@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Plus, Search, Users, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react'
 import LoadingSpinner from '../components/LoadingSpinner'
 import EmptyState from '../components/EmptyState'
@@ -14,11 +14,12 @@ const TABS = [
 ]
 
 export default function CandidateList() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [candidates, setCandidates] = useState([])
   const [loading, setLoading]       = useState(true)
-  const [search, setSearch]         = useState('')
-  const [tab, setTab]               = useState('real')
-  const [page, setPage]             = useState(1)
+  const [search, setSearch]         = useState(searchParams.get('q') ?? '')
+  const [tab, setTab]               = useState(searchParams.get('tab') ?? 'real')
+  const [page, setPage]             = useState(Number(searchParams.get('page')) || 1)
   const [total, setTotal]           = useState(0)
 
   const tabParams = TABS.find(t => t.key === tab)?.params ?? {}
@@ -41,8 +42,30 @@ export default function CandidateList() {
 
   useEffect(() => { fetch() }, [fetch])
 
-  const switchTab = t => { setTab(t); setPage(1); setSearch('') }
-  const goPage = p => setPage(Math.max(1, Math.min(p, totalPages)))
+  const syncParams = (next) => {
+    const params = { tab: next.tab ?? tab }
+    const q = next.search ?? search
+    const p = next.page ?? page
+    if (q) params.q = q
+    if (p > 1) params.page = String(p)
+    setSearchParams(params)
+  }
+
+  const switchTab = t => {
+    setTab(t); setPage(1); setSearch('')
+    syncParams({ tab: t, search: '', page: 1 })
+  }
+  const onSearchChange = value => {
+    setSearch(value); setPage(1)
+    syncParams({ search: value, page: 1 })
+  }
+  const goPage = p => {
+    const next = Math.max(1, Math.min(p, totalPages))
+    setPage(next)
+    syncParams({ page: next })
+  }
+
+  const listReturnTo = `/candidates?${searchParams.toString()}`
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -78,7 +101,7 @@ export default function CandidateList() {
           className="input pl-9"
           placeholder="Search by name, title, location…"
           value={search}
-          onChange={e => { setSearch(e.target.value); setPage(1) }}
+          onChange={e => onSearchChange(e.target.value)}
         />
       </div>
 
@@ -97,7 +120,7 @@ export default function CandidateList() {
             {candidates.map(c => (
               <Link
                 key={c.id}
-                to={`/candidates/${c.id}`}
+                to={`/candidates/${c.id}?returnTo=${encodeURIComponent(listReturnTo)}`}
                 className="card flex items-center gap-4 px-4 py-4 hover:border-scarlet-500/30 hover:bg-surface-600 transition-all group"
               >
                 <div className="w-10 h-10 rounded-full bg-scarlet-500/20 border border-scarlet-500/30 flex items-center justify-center text-sm font-bold text-scarlet-400 flex-shrink-0">

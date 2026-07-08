@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
-import { createJob } from '../api/jobs'
+import { createJob, setJobSkills } from '../api/jobs'
+import SkillCombobox from '../components/SkillCombobox'
 import toast from 'react-hot-toast'
 
 const FIELD = ({ label, name, form, onChange, type = 'text', required = false, className = '' }) => (
@@ -21,6 +22,7 @@ export default function JobCreate() {
     industry: '', status: 'active',
   })
   const [loading, setLoading] = useState(false)
+  const [skills, setSkills] = useState([])
 
   const onChange = e => setForm(f => ({ ...f, [e.target.name]: e.target.value }))
 
@@ -34,6 +36,7 @@ export default function JobCreate() {
         salary_max: form.salary_max !== '' ? Number(form.salary_max) : null,
       }
       const { data } = await createJob(payload)
+      if (skills.length) await setJobSkills(data.id, skills)
       toast.success('Job posted successfully')
       navigate(`/jobs/${data.id}`)
     } catch (err) {
@@ -81,8 +84,13 @@ export default function JobCreate() {
             />
           </div>
           <div>
+            <label className="label">Required Skills</label>
+            <p className="text-xs text-gray-500 mb-1">Search the skill library or add a new one. These drive candidate matching directly.</p>
+            <SkillCombobox value={skills} onChange={setSkills} />
+          </div>
+          <div>
             <label className="label">Requirements</label>
-            <p className="text-xs text-gray-500 mb-1">Enter one requirement per line. Skills listed here are used for candidate matching.</p>
+            <p className="text-xs text-gray-500 mb-1">Optional free-text detail (one per line) shown on the job posting — use Required Skills above for matching.</p>
             <textarea name="requirements" rows={5} className="input resize-none font-mono text-xs" value={form.requirements} onChange={onChange}
               placeholder={"Python (3+ years)\nMachine learning with scikit-learn or XGBoost\nSQL and data pipeline experience\nFamiliarity with AWS or cloud platforms\nExperience with NLP or entity resolution"} />
           </div>

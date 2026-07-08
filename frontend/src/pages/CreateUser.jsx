@@ -37,7 +37,7 @@ export default function CreateUser() {
     email: '',
     password: '',
     role: roleOptions[0]?.value ?? '',
-    organisation: '',
+    organization_name: '',
     phone: '',
     country: '',
   })
@@ -169,15 +169,17 @@ export default function CreateUser() {
         </div>
 
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-300">Organisation</label>
-            <input
-              value={form.organisation}
-              onChange={(e) => setForm({ ...form, organisation: e.target.value })}
-              placeholder="Company name"
-              className="w-full rounded-lg border border-surface-400 bg-surface-700 px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-scarlet-500 focus:outline-none"
-            />
-          </div>
+          {actor.is_platform_staff && (
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-300">Organization</label>
+              <input
+                value={form.organization_name}
+                onChange={(e) => setForm({ ...form, organization_name: e.target.value })}
+                placeholder="Company name (existing or new)"
+                className="w-full rounded-lg border border-surface-400 bg-surface-700 px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-scarlet-500 focus:outline-none"
+              />
+            </div>
+          )}
           <div>
             <label className="mb-1.5 block text-sm font-medium text-gray-300">Country</label>
             <input

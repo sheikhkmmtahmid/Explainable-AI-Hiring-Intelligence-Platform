@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Plus, Search, Briefcase, MapPin, ArrowRight } from 'lucide-react'
 import LoadingSpinner from '../components/LoadingSpinner'
 import EmptyState from '../components/EmptyState'
@@ -23,10 +23,11 @@ const TABS = [
 ]
 
 export default function JobList() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [jobs, setJobs]       = useState([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch]   = useState('')
-  const [tab, setTab]         = useState('manual')
+  const [search, setSearch]   = useState(searchParams.get('q') ?? '')
+  const [tab, setTab]         = useState(searchParams.get('tab') ?? 'manual')
 
   const fetchJobs = useCallback(() => {
     setLoading(true)
@@ -37,6 +38,19 @@ export default function JobList() {
   }, [search, tab])
 
   useEffect(() => { fetchJobs() }, [fetchJobs])
+
+  const selectTab = (key) => {
+    setTab(key)
+    setSearch('')
+    setSearchParams({ tab: key })
+  }
+
+  const onSearchChange = (value) => {
+    setSearch(value)
+    setSearchParams(value ? { tab, q: value } : { tab })
+  }
+
+  const listReturnTo = `/jobs?${searchParams.toString()}`
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -55,7 +69,7 @@ export default function JobList() {
         {TABS.map(t => (
           <button
             key={t.key}
-            onClick={() => { setTab(t.key); setSearch('') }}
+            onClick={() => selectTab(t.key)}
             className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
               tab === t.key
                 ? 'bg-scarlet-500 text-white shadow'
@@ -74,7 +88,7 @@ export default function JobList() {
           className="input pl-9"
           placeholder="Search by title, company, location…"
           value={search}
-          onChange={e => setSearch(e.target.value)}
+          onChange={e => onSearchChange(e.target.value)}
         />
       </div>
 
@@ -96,7 +110,7 @@ export default function JobList() {
           {jobs.map(job => (
             <Link
               key={job.id}
-              to={`/jobs/${job.id}`}
+              to={`/jobs/${job.id}?returnTo=${encodeURIComponent(listReturnTo)}`}
               className="card flex items-center justify-between px-5 py-4 hover:border-scarlet-500/30 hover:bg-surface-600 transition-all group"
             >
               <div className="flex items-start gap-4 min-w-0">

@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, MapPin, Briefcase, GraduationCap, Pencil, X, Check, Upload, FileCheck, FileText, CheckCircle2, Clock, Trash2 } from 'lucide-react'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -39,6 +39,8 @@ function Field({ label, children }) {
 
 export default function CandidateDetail() {
   const { id } = useParams()
+  const [searchParams] = useSearchParams()
+  const returnTo = searchParams.get('returnTo')
   const [candidate, setCandidate] = useState(null)
   const [loading, setLoading]     = useState(true)
   const [editing, setEditing]     = useState(false)
@@ -183,7 +185,7 @@ export default function CandidateDetail() {
         onCancel={() => setConfirmDeleteCV(null)}
       />
 
-      <Link to="/candidates" className="btn-ghost text-sm inline-flex"><ArrowLeft className="w-4 h-4" /> Back</Link>
+      <Link to={returnTo || '/candidates'} className="btn-ghost text-sm inline-flex"><ArrowLeft className="w-4 h-4" /> Back</Link>
 
       {/* ── EDIT MODE ── */}
       {editing ? (
