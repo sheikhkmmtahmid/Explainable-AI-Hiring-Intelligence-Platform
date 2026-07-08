@@ -17,6 +17,8 @@ api_v1_patterns = [
     path("taxonomy/", include("apps.taxonomy.urls")),
     path("synthetic/", include("apps.synthetic_data.urls")),
     path("tasks/", include("apps.tasks.urls")),
+    path("billing/", include("apps.billing.urls")),
+    path("organizations/", include("apps.organizations.urls")),
 ]
 
 urlpatterns = [

@@ -59,7 +59,9 @@ class CandidateCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         user = self.context["request"].user
         # Only link the Django user to the candidate profile when the user IS the candidate.
-        # Admins and recruiters create profiles on behalf of other people.
+        # Admins and recruiters create profiles on behalf of other people --
+        # in that case the candidate is privately "sourced" by that org, so
+        # it stays visible to them even before any Application exists.
         if getattr(user, "role", None) == "candidate":
             return Candidate.objects.create(user=user, **validated_data)
-        return Candidate.objects.create(**validated_data)
+        return Candidate.objects.create(sourced_by_organization=user.organization, **validated_data)

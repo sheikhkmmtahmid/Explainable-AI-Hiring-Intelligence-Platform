@@ -11,6 +11,8 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 from faker import Faker
 
+from apps.common import lorem_en
+
 fake = Faker("en_GB")
 
 TITLES = [
@@ -93,7 +95,7 @@ def make_description(title, company, industry):
         f"{company} is looking for a talented {title} to join our {industry} team. "
         f"You will work on challenging problems involving large-scale data, building and deploying "
         f"machine learning models, and collaborating with cross-functional teams. "
-        f"{fake.paragraph(nb_sentences=3)}"
+        f"{lorem_en.job_paragraph(3)}"
     )
 
 
@@ -101,15 +103,12 @@ def make_requirements(skills):
     lines = [
         f"Experience with {s}." for s in random.sample(skills, min(len(skills), 5))
     ]
-    lines += [
-        fake.sentence(),
-        fake.sentence(),
-    ]
+    lines += lorem_en.job_sentences(2)
     return "\n".join(lines)
 
 
 def make_responsibilities():
-    return "\n".join(fake.sentence() for _ in range(random.randint(4, 7)))
+    return "\n".join(lorem_en.job_sentences(random.randint(4, 7)))
 
 
 class Command(BaseCommand):

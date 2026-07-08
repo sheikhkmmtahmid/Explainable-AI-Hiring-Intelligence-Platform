@@ -10,6 +10,8 @@ import random
 from django.core.management.base import BaseCommand
 from faker import Faker
 
+from apps.common import lorem_en
+
 fake = Faker("en_GB")
 
 TITLES = [
@@ -78,14 +80,14 @@ def make_cv_text(name, title, yoe, education, education_field, skills, city, cou
 {city}, {country} | {fake.email()}
 
 PROFESSIONAL SUMMARY
-{title} with {yoe:.0f} years of experience. {fake.paragraph(nb_sentences=2)}
+{title} with {yoe:.0f} years of experience. {lorem_en.candidate_paragraph(2)}
 
 EXPERIENCE
 {title} — {fake.company()} ({fake.year()}–Present)
-{fake.paragraph(nb_sentences=3)}
+{lorem_en.candidate_paragraph(3)}
 
 {fake.job()} — {fake.company()} ({int(fake.year()) - 3}–{int(fake.year()) - 1})
-{fake.paragraph(nb_sentences=2)}
+{lorem_en.candidate_paragraph(2)}
 
 EDUCATION
 {education.replace('_', "'s'").title()} {education_field} — {fake.company() + " University"}, {fake.year()}
@@ -151,7 +153,7 @@ class Command(BaseCommand):
                     age_range=random.choice(AGE_RANGES),
                     ethnicity=random.choice(ETHNICITIES),
                     disability_status=random.choice([True, False, None]),
-                    summary=fake.paragraph(nb_sentences=3),
+                    summary=lorem_en.candidate_paragraph(3),
                     raw_cv_text=cv_text,
                     is_synthetic=True,
                 )

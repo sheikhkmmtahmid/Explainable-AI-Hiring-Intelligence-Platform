@@ -54,8 +54,9 @@ def extract_phone(text: str) -> Optional[str]:
     return match.group(0).strip() if match else None
 
 
-def extract_skills_from_text(text: str) -> list[dict]:
-    """Simple pattern-based skill extractor. Will be augmented by NER in ml layer."""
+def _extract_skills_keyword_fallback(text: str) -> list[dict]:
+    """Plain substring matcher -- kept as a safety net if the spaCy/taxonomy
+    matcher is unavailable for any reason."""
     text_lower = text.lower()
     found = []
     for skill in SKILL_PATTERNS:
@@ -64,12 +65,46 @@ def extract_skills_from_text(text: str) -> list[dict]:
     return found
 
 
+def extract_skills_from_text(text: str) -> list[dict]:
+    """
+    Extract skills from text using spaCy's PhraseMatcher against the
+    SkillTaxonomy (proper word-boundary matching + alias resolution --
+    see ml.nlp.skill_matcher). Falls back to plain keyword matching if
+    that fails for any reason (e.g. spaCy model or DB unavailable).
+    """
+    try:
+        from ml.nlp.skill_matcher import extract_skills_with_taxonomy
+        return extract_skills_with_taxonomy(text)
+    except Exception as exc:
+        logger.warning("Taxonomy-based skill extraction failed, using keyword fallback: %s", exc)
+        return _extract_skills_keyword_fallback(text)
+
+
 def extract_years_of_experience(text: str) -> float:
-    """Heuristic: look for patterns like '5 years of experience'."""
+    """Heuristic: look for patterns like '5 years of experience'.
+
+    This is a fallback signal only -- prefer computing years of experience
+    from parsed CandidateExperience date ranges (see extract_experience_entries
+    below + apps.candidates.services.update_years_of_experience), which
+    works even when the CV never states a total explicitly.
+    """
     match = re.search(r"(\d+(?:\.\d+)?)\s*\+?\s*years?\s+(?:of\s+)?experience", text, re.IGNORECASE)
     if match:
         return float(match.group(1))
     return 0.0
+
+
+def extract_experience_entries(text: str) -> list[dict]:
+    """Extract structured work-history entries (title, company, location,
+    start/end dates) from the CV's experience section. See
+    ml.nlp.experience_extractor for the implementation and its documented
+    limitations."""
+    try:
+        from ml.nlp.experience_extractor import extract_experience_entries as _extract
+        return _extract(text)
+    except Exception as exc:
+        logger.warning("Experience entry extraction failed: %s", exc)
+        return []
 
 
 def parse_cv_text(raw_text: str) -> dict:
@@ -79,4 +114,5 @@ def parse_cv_text(raw_text: str) -> dict:
         "phone": extract_phone(raw_text),
         "skills": extract_skills_from_text(raw_text),
         "years_of_experience": extract_years_of_experience(raw_text),
+        "experience_entries": extract_experience_entries(raw_text),
     }

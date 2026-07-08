@@ -9,6 +9,8 @@ from typing import Optional
 
 from faker import Faker
 
+from apps.common import lorem_en
+
 fake = Faker()
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -192,7 +194,7 @@ def generate_candidate_data() -> dict:
         "current_title": random.choice(JOB_TITLES),
         "years_of_experience": years_exp,
         "seniority_level": random.choice(SENIORITY_LEVELS),
-        "summary": fake.paragraph(nb_sentences=4),
+        "summary": lorem_en.candidate_paragraph(4),
         "highest_education": random.choice(EDUCATION_LEVELS),
         "education_field": random.choice([
             "Computer Science", "Engineering", "Business",
@@ -207,7 +209,7 @@ def generate_candidate_data() -> dict:
         "ethnicity": random.choice(ETHNICITY_VALUES),
         "disability_status": random.choice([True, False, None]),
         "is_synthetic": True,
-        "raw_cv_text": fake.paragraph(nb_sentences=20),
+        "raw_cv_text": lorem_en.candidate_paragraph(20),
         "skills": skills,
     }
 
@@ -222,9 +224,9 @@ def generate_job_data() -> dict:
     return {
         "title": random.choice(JOB_TITLES),
         "company": fake.company(),
-        "description": fake.paragraph(nb_sentences=8),
-        "requirements": fake.paragraph(nb_sentences=5),
-        "responsibilities": fake.paragraph(nb_sentences=5),
+        "description": lorem_en.job_paragraph(8),
+        "requirements": lorem_en.job_paragraph(5),
+        "responsibilities": lorem_en.job_paragraph(5),
         "country": random.choice(GLOBAL_COUNTRIES),
         "city": fake.city(),
         "region": fake.state(),

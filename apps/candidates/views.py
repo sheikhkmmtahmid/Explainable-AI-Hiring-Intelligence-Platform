@@ -1,3 +1,5 @@
+from django.core.exceptions import PermissionDenied
+from django.db.models import Q
 from rest_framework import generics, permissions, parsers, status
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
@@ -14,7 +16,12 @@ from .serializers import (
     CandidateSerializer,
     CandidateSkillSerializer,
 )
-from .services import attach_cv, get_or_create_candidate_for_user
+from .services import (
+    anonymize_candidate,
+    attach_cv,
+    export_candidate_data,
+    get_or_create_candidate_for_user,
+)
 
 
 class CandidateViewSet(ModelViewSet):
@@ -24,10 +31,24 @@ class CandidateViewSet(ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user.role in ("admin", "recruiter", "analyst"):
-            qs = Candidate.objects.prefetch_related("skills", "experiences", "cvs").all()
+        base = Candidate.objects.prefetch_related("skills", "experiences", "cvs")
+
+        if user.is_platform_staff:
+            qs = base.all()
+        elif user.role in ("admin", "recruiter", "analyst"):
+            # Private per company: visible if this org sourced the candidate
+            # directly, or the candidate applied to one of this org's jobs.
+            # Never the whole platform's candidate pool -- that would leak
+            # one customer's applicant list to a competing customer.
+            if not user.organization_id:
+                qs = base.none()
+            else:
+                qs = base.filter(
+                    Q(sourced_by_organization_id=user.organization_id)
+                    | Q(applications__job__organization_id=user.organization_id)
+                ).distinct()
         else:
-            qs = Candidate.objects.prefetch_related("skills", "experiences", "cvs").filter(user=user)
+            qs = base.filter(user=user)
 
         # Filter by is_synthetic if passed as query param
         is_synthetic = self.request.query_params.get("is_synthetic")
@@ -73,3 +94,25 @@ class CandidateViewSet(ModelViewSet):
         candidate = self.get_object()
         exps = CandidateExperience.objects.filter(candidate=candidate)
         return Response(CandidateExperienceSerializer(exps, many=True).data)
+
+    @action(detail=True, methods=["get"])
+    def export_data(self, request, pk=None):
+        """GDPR 'right to access' -- everything the platform holds about
+        this person, as one downloadable document."""
+        candidate = self.get_object()
+        return Response(export_candidate_data(candidate))
+
+    @action(detail=True, methods=["post"])
+    def request_deletion(self, request, pk=None):
+        """GDPR 'right to erasure'. Only the candidate themselves or
+        platform staff can invoke this -- a hiring org seeing this
+        candidate can't erase someone's identity on their own say-so, that
+        would let a company destroy the evidence behind its own hiring
+        decisions."""
+        candidate = self.get_object()
+        user = request.user
+        is_self = candidate.user_id == user.id
+        if not (is_self or user.is_platform_staff):
+            raise PermissionDenied("Only the candidate or platform staff can request data deletion.")
+        anonymize_candidate(candidate)
+        return Response({"detail": "Personal data has been anonymized."})

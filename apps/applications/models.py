@@ -23,13 +23,10 @@ class Application(models.Model):
     applied_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    # Scores
-    overall_match_score = models.FloatField(null=True, blank=True)
-    semantic_score = models.FloatField(null=True, blank=True)
-    skill_overlap_score = models.FloatField(null=True, blank=True)
-    experience_score = models.FloatField(null=True, blank=True)
-    education_score = models.FloatField(null=True, blank=True)
-    rank = models.IntegerField(null=True, blank=True)
+    # NOTE: match scores (overall/semantic/skill/experience/education/rank) are
+    # intentionally NOT stored here. They live on MatchResult and are looked
+    # up live by the serializer -- storing a second copy risks it going stale
+    # whenever a job gets re-matched. See ApplicationSerializer.
 
     # Recruiter actions
     reviewed_by = models.ForeignKey(
@@ -46,11 +43,38 @@ class Application(models.Model):
 
     class Meta:
         db_table = "applications_application"
-        ordering = ["-overall_match_score", "-applied_at"]
+        ordering = ["-applied_at"]
         unique_together = [["candidate", "job"]]
 
     def __str__(self):
         return f"{self.candidate.full_name} → {self.job.title} ({self.status})"
+
+
+class ApplicationStatusHistory(models.Model):
+    """
+    Every status transition an application goes through, kept forever
+    (Application.status/reviewed_by/reviewed_at only holds the CURRENT
+    state -- each change here overwrote the last, leaving no trail of who
+    actually decided what). This is what makes a real fairness audit
+    possible: "were our actual hiring decisions fair" needs to know who
+    got shortlisted/rejected and by whom, not just today's snapshot.
+    """
+    application = models.ForeignKey(Application, on_delete=models.CASCADE, related_name="status_history")
+    from_status = models.CharField(max_length=20, blank=True)
+    to_status = models.CharField(max_length=20)
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="application_status_changes",
+    )
+    changed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "applications_status_history"
+        ordering = ["-changed_at"]
+        verbose_name_plural = "Application status histories"
+
+    def __str__(self):
+        return f"{self.application_id}: {self.from_status} -> {self.to_status}"
 
 
 class ApplicationNote(models.Model):

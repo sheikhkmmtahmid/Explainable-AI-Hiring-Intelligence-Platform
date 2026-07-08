@@ -126,18 +126,91 @@ def build_training_data() -> tuple[np.ndarray, np.ndarray]:
     return np.array(X_rows, dtype=np.float32), np.array(y_labels, dtype=np.int32)
 
 
+def _sample_weights(y: np.ndarray) -> np.ndarray:
+    """Balanced sample weights -- with hiring data typically ~90% negative,
+    an unweighted fit mostly learns to predict the majority class."""
+    from sklearn.utils.class_weight import compute_sample_weight
+    return compute_sample_weight("balanced", y)
+
+
+def _cross_validate(X: np.ndarray, y: np.ndarray, n_positive: int, n_negative: int) -> dict:
+    """
+    Stratified k-fold evaluation. A single train/test split is unreliable
+    at the sample sizes this model typically has to work with -- with
+    e.g. 13 positive examples, a 20% test split leaves only ~3 of them,
+    and ROC-AUC swings wildly depending on which 3 happened to land in
+    the test fold. Averaging over several folds gives an honest estimate
+    of both the score and its uncertainty (std).
+    """
+    from sklearn.metrics import roc_auc_score, average_precision_score, precision_score, recall_score, f1_score
+    from sklearn.model_selection import StratifiedKFold
+
+    n_splits = max(2, min(5, n_positive, n_negative))
+    if n_splits < 2:
+        return {}
+
+    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
+    roc_aucs, pr_aucs, precisions, recalls, f1s = [], [], [], [], []
+
+    for train_idx, test_idx in skf.split(X, y):
+        X_train, y_train = X[train_idx], y[train_idx]
+        X_test, y_test = X[test_idx], y[test_idx]
+
+        fold_clf = _build_classifier()
+        weights = _sample_weights(y_train)
+        fold_clf.fit(X_train, y_train, sample_weight=weights)
+
+        y_prob = fold_clf.predict_proba(X_test)[:, 1]
+        y_pred = fold_clf.predict(X_test)
+
+        try:
+            roc_aucs.append(roc_auc_score(y_test, y_prob))
+        except Exception:
+            pass
+        try:
+            pr_aucs.append(average_precision_score(y_test, y_prob))
+        except Exception:
+            pass
+        precisions.append(precision_score(y_test, y_pred, zero_division=0))
+        recalls.append(recall_score(y_test, y_pred, zero_division=0))
+        f1s.append(f1_score(y_test, y_pred, zero_division=0))
+
+    def _mean_std(values):
+        if not values:
+            return None, None
+        arr = np.array(values, dtype=np.float64)
+        return float(arr.mean()), float(arr.std())
+
+    roc_mean, roc_std = _mean_std(roc_aucs)
+    pr_mean, pr_std = _mean_std(pr_aucs)
+
+    return {
+        "cv_folds": n_splits,
+        "roc_auc_mean": round(roc_mean, 4) if roc_mean is not None else None,
+        "roc_auc_std": round(roc_std, 4) if roc_std is not None else None,
+        "pr_auc_mean": round(pr_mean, 4) if pr_mean is not None else None,
+        "pr_auc_std": round(pr_std, 4) if pr_std is not None else None,
+        "precision_mean": round(float(np.mean(precisions)), 4) if precisions else None,
+        "recall_mean": round(float(np.mean(recalls)), 4) if recalls else None,
+        "f1_mean": round(float(np.mean(f1s)), 4) if f1s else None,
+    }
+
+
 def train_and_save(min_samples: int = MIN_SAMPLES, output_path: Path = MODEL_PATH) -> dict:
     """
-    Build training data, fit the model, save to disk.
+    Build training data, evaluate via stratified k-fold CV, fit the final
+    model on all data with balanced sample weights, and save to disk.
 
-    Returns a summary dict with n_samples, n_positive, n_negative, and
-    training accuracy.
+    Returns a summary dict with sample counts and CV metrics (ROC-AUC and
+    PR-AUC mean/std, precision/recall/F1). PR-AUC and precision/recall are
+    reported alongside ROC-AUC because with heavily imbalanced hiring data
+    (typically ~90% "not hired"), ROC-AUC alone can look deceptively
+    reasonable while the model is barely better than predicting the
+    majority class -- PR-AUC and recall on the positive class make that
+    visible.
 
     Raises ValueError if there are not enough labelled samples.
     """
-    from sklearn.metrics import accuracy_score, roc_auc_score
-    from sklearn.model_selection import train_test_split
-
     logger.info("Building training data from MatchResult.hired labels...")
     X, y = build_training_data()
 
@@ -159,30 +232,23 @@ def train_and_save(min_samples: int = MIN_SAMPLES, output_path: Path = MODEL_PAT
             "Both classes (hired=True and hired=False) must have at least one sample."
         )
 
-    clf = _build_classifier()
-
-    # Only split if we have enough data for a meaningful eval set
-    if n_samples >= 100:
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, stratify=y, random_state=42
+    cv_metrics = _cross_validate(X, y, n_positive, n_negative)
+    if cv_metrics:
+        logger.info(
+            "CV (%d folds): ROC-AUC %.4f ± %.4f | PR-AUC %.4f ± %.4f | "
+            "precision %.4f | recall %.4f | F1 %.4f",
+            cv_metrics["cv_folds"],
+            cv_metrics["roc_auc_mean"] or 0, cv_metrics["roc_auc_std"] or 0,
+            cv_metrics["pr_auc_mean"] or 0, cv_metrics["pr_auc_std"] or 0,
+            cv_metrics["precision_mean"] or 0, cv_metrics["recall_mean"] or 0, cv_metrics["f1_mean"] or 0,
         )
-        clf.fit(X_train, y_train)
-        y_pred = clf.predict(X_test)
-        y_prob = clf.predict_proba(X_test)[:, 1]
-        accuracy = float(accuracy_score(y_test, y_pred))
-        try:
-            roc_auc = float(roc_auc_score(y_test, y_prob))
-        except Exception:
-            roc_auc = None
-        logger.info("Test accuracy: %.4f  |  ROC-AUC: %s", accuracy, f"{roc_auc:.4f}" if roc_auc else "n/a")
-        # Retrain on full data after evaluation
-        clf.fit(X, y)
     else:
-        clf.fit(X, y)
-        y_pred = clf.predict(X)
-        accuracy = float(accuracy_score(y, y_pred))
-        roc_auc = None
-        logger.info("Training accuracy (no eval split -- too few samples): %.4f", accuracy)
+        logger.info("Too few samples per class for cross-validation -- skipping CV metrics.")
+
+    # Final model: fit on all available data (with balanced weights) so the
+    # deployed model benefits from every labelled example, not just a split.
+    clf = _build_classifier()
+    clf.fit(X, y, sample_weight=_sample_weights(y))
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(clf, output_path)
@@ -192,7 +258,13 @@ def train_and_save(min_samples: int = MIN_SAMPLES, output_path: Path = MODEL_PAT
         "n_samples": n_samples,
         "n_positive": n_positive,
         "n_negative": n_negative,
-        "accuracy": round(accuracy, 4),
-        "roc_auc": round(roc_auc, 4) if roc_auc else None,
+        "cv_folds": cv_metrics.get("cv_folds"),
+        "roc_auc_mean": cv_metrics.get("roc_auc_mean"),
+        "roc_auc_std": cv_metrics.get("roc_auc_std"),
+        "pr_auc_mean": cv_metrics.get("pr_auc_mean"),
+        "pr_auc_std": cv_metrics.get("pr_auc_std"),
+        "precision_mean": cv_metrics.get("precision_mean"),
+        "recall_mean": cv_metrics.get("recall_mean"),
+        "f1_mean": cv_metrics.get("f1_mean"),
         "model_path": str(output_path),
     }

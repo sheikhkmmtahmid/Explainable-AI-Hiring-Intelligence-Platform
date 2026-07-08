@@ -15,6 +15,19 @@ class Candidate(models.Model):
         null=True,
         blank=True,
     )
+    # A candidate is a person, not owned by one company -- they can apply to
+    # many organizations' jobs. This field only covers the case where a
+    # recruiter privately adds/sources a candidate (e.g. uploads a CV)
+    # *before* any Application exists, so that candidate is still visible to
+    # them. Real visibility logic lives in CandidateViewSet.get_queryset:
+    # an org can see a candidate if sourced_by_organization is theirs OR
+    # the candidate has an Application to one of their jobs.
+    sourced_by_organization = models.ForeignKey(
+        "organizations.Organization", null=True, blank=True,
+        on_delete=models.SET_NULL, related_name="sourced_candidates",
+        # See apps/accounts/models.py User.organization for why db_constraint=False.
+        db_constraint=False,
+    )
     # For synthetic candidates, no user account
     full_name = models.CharField(max_length=255)
     email = models.EmailField(unique=True)

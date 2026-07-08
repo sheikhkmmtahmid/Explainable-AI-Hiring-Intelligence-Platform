@@ -28,6 +28,8 @@ THIRD_PARTY_APPS = [
 ]
 
 LOCAL_APPS = [
+    "apps.organizations",
+    "apps.billing",
     "apps.accounts",
     "apps.candidates",
     "apps.jobs",
@@ -135,6 +137,14 @@ REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": [
         "rest_framework.renderers.JSONRenderer",
     ],
+    # Scoped throttles applied per-view (see apps/accounts/views.py) --
+    # brute-force protection on login/register/password-change. Keyed by IP
+    # for anonymous endpoints since there's no authenticated user yet.
+    "DEFAULT_THROTTLE_RATES": {
+        "auth_login": "10/min",
+        "auth_register": "5/min",
+        "auth_password_change": "5/min",
+    },
 }
 
 # JWT
@@ -182,6 +192,21 @@ ADZUNA_APP_ID = config("ADZUNA_APP_ID", default="")
 ADZUNA_API_KEY = config("ADZUNA_API_KEY", default="")
 JOOBLE_API_KEY = config("JOOBLE_API_KEY", default="")
 THE_MUSE_API_KEY = config("THE_MUSE_API_KEY", default="")
+
+# Billing -- blank by default; each provider degrades to "not configured
+# yet" rather than crashing when its keys are unset (see apps/billing/providers).
+STRIPE_SECRET_KEY = config("STRIPE_SECRET_KEY", default="")
+STRIPE_PUBLISHABLE_KEY = config("STRIPE_PUBLISHABLE_KEY", default="")
+STRIPE_WEBHOOK_SECRET = config("STRIPE_WEBHOOK_SECRET", default="")
+SSLCOMMERZ_STORE_ID = config("SSLCOMMERZ_STORE_ID", default="")
+SSLCOMMERZ_STORE_PASSWORD = config("SSLCOMMERZ_STORE_PASSWORD", default="")
+SSLCOMMERZ_SANDBOX = config("SSLCOMMERZ_SANDBOX", default=True, cast=bool)
+BILLING_SUCCESS_URL = config("BILLING_SUCCESS_URL", default="http://localhost:3000/billing?status=success")
+BILLING_CANCEL_URL = config("BILLING_CANCEL_URL", default="http://localhost:3000/billing?status=cancelled")
+# Where the backend itself is reachable from the outside world -- needed so
+# providers like SSLCommerz (which call back to our IPN endpoint, not the
+# frontend) know where to send that callback.
+BACKEND_BASE_URL = config("BACKEND_BASE_URL", default="http://localhost:8001")
 
 # Matching thresholds
 MATCH_SCORE_THRESHOLD = 0.5

@@ -23,6 +23,16 @@ class JobPost(models.Model):
         LEAD = "lead", "Lead / Principal"
         EXECUTIVE = "executive", "Executive"
 
+    # Tenancy boundary -- which company posted this job. Nullable only to
+    # ease the migration of pre-existing/synthetic data; new jobs created
+    # through the API always get the creator's organization.
+    organization = models.ForeignKey(
+        "organizations.Organization", null=True, blank=True,
+        on_delete=models.CASCADE, related_name="jobs",
+        # See apps/accounts/models.py User.organization for why db_constraint=False.
+        db_constraint=False,
+    )
+
     # Core fields
     title = models.CharField(max_length=300)
     company = models.CharField(max_length=255)

@@ -1,5 +1,6 @@
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -20,6 +21,8 @@ class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserRegistrationSerializer
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "auth_register"
 
     def perform_create(self, serializer):
         # Task 9: without authentication, new user gets default role = candidate (employee)
@@ -29,6 +32,8 @@ class RegisterView(generics.CreateAPIView):
 class LoginView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "auth_login"
 
 
 class MeView(generics.RetrieveUpdateAPIView):
@@ -56,6 +61,8 @@ class LogoutView(APIView):
 
 class ChangePasswordView(APIView):
     permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "auth_password_change"
 
     def post(self, request):
         user = request.user
@@ -75,35 +82,50 @@ class ChangePasswordView(APIView):
 
 class CreateUserView(APIView):
     """
-    Task 7 & 8: Admin can create admin/recruiter/candidate.
-    Manager (recruiter) can create recruiter/candidate only.
+    Platform staff (is_superuser) can create a user for any organization
+    (or a brand new one). An org admin/recruiter can only create
+    recruiter/candidate accounts inside their OWN organization -- the
+    organization is never taken from the request body for that path, it's
+    forced server-side from actor.organization so one company can never
+    add a user into another company's account.
     """
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
         actor = request.user
-        if actor.role == User.Role.ADMIN:
+        if actor.is_platform_staff:
             serializer = AdminCreateUserSerializer(data=request.data)
-        elif actor.role == User.Role.RECRUITER:
+            serializer.is_valid(raise_exception=True)
+            user = serializer.save()
+        elif actor.role in (User.Role.ADMIN, User.Role.RECRUITER):
+            if actor.organization_id is None:
+                return Response(
+                    {"detail": "Your account isn't linked to an organization yet."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             serializer = ManagerCreateUserSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            user = serializer.save(organization=actor.organization)
         else:
             return Response(
                 {"detail": "You do not have permission to create users."},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        serializer.is_valid(raise_exception=True)
-        user = serializer.save()
         return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
 
 
 class UserListView(APIView):
-    """Admin and managers can list all users (for task assignment dropdowns)."""
+    """Admin and managers can list users in their own organization (for task
+    assignment dropdowns) -- platform staff can see everyone."""
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
         user = request.user
-        if user.role not in (User.Role.ADMIN, User.Role.RECRUITER):
+        if user.is_platform_staff:
+            users = User.objects.all().order_by("username")
+        elif user.role in (User.Role.ADMIN, User.Role.RECRUITER):
+            users = User.objects.filter(organization=user.organization).order_by("username")
+        else:
             return Response({"detail": "Forbidden."}, status=status.HTTP_403_FORBIDDEN)
-        users = User.objects.all().order_by("username")
         return Response(UserSerializer(users, many=True).data)

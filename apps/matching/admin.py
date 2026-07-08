@@ -5,8 +5,10 @@ from .models import MatchResult, MatchBatchRun
 
 @admin.register(MatchResult)
 class MatchResultAdmin(admin.ModelAdmin):
-    list_display = ["candidate", "job", "overall_score", "rank", "computed_at"]
-    list_filter = ["model_version"]
+    list_display = ["candidate", "job", "overall_score", "rank", "hired", "computed_at"]
+    list_display_links = ["candidate", "job"]
+    list_editable = ["hired"]
+    list_filter = ["model_version", "hired"]
     search_fields = ["candidate__full_name", "job__title"]
 
 

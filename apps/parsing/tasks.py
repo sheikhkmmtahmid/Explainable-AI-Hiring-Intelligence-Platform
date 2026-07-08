@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
 def parse_cv_task(self, cv_id: int):
     """Parse an uploaded CV and populate candidate profile data."""
-    from apps.candidates.models import CandidateCV
+    from apps.candidates.models import CandidateCV, CandidateExperience
     from apps.candidates.services import add_skill, update_years_of_experience
     from apps.parsing.models import ParseJob
     from apps.parsing.services import extract_text_from_file, parse_cv_text
@@ -37,7 +37,26 @@ def parse_cv_task(self, cv_id: int):
         for skill_data in parsed.get("skills", []):
             add_skill(candidate, source="cv_parsed", **skill_data)
 
-        if parsed.get("years_of_experience"):
+        experience_entries = parsed.get("experience_entries") or []
+        for entry in experience_entries:
+            CandidateExperience.objects.update_or_create(
+                candidate=candidate,
+                job_title=entry["job_title"],
+                company=entry["company"],
+                start_date=entry["start_date"],
+                defaults={
+                    "location": entry.get("location", ""),
+                    "end_date": entry["end_date"],
+                    "is_current": entry["is_current"],
+                    "description": entry.get("description", ""),
+                },
+            )
+
+        if experience_entries:
+            # Prefer computing years of experience from real date ranges --
+            # works even when the CV never states a total explicitly.
+            update_years_of_experience(candidate)
+        elif parsed.get("years_of_experience"):
             candidate.years_of_experience = parsed["years_of_experience"]
             candidate.save(update_fields=["years_of_experience"])
 

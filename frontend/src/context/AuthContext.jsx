@@ -36,8 +36,17 @@ export function AuthProvider({ children }) {
     }
   }
 
+  // Re-fetch the current user -- used after something server-side changes
+  // that /me reflects but our cached user object doesn't yet, e.g. editing
+  // the organization's country on the Billing page.
+  const refreshUser = async () => {
+    const { data } = await getMe()
+    setUser(data)
+    return data
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   )

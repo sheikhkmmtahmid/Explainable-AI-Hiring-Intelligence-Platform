@@ -16,15 +16,15 @@ class TaskViewSet(ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        base = Task.objects.select_related("created_by", "assigned_to")
+        if user.is_platform_staff:
+            return base.all()
         if user.role in MANAGER_ROLES:
-            # managers and admins see every task
-            return Task.objects.select_related("created_by", "assigned_to").all()
+            # managers/admins see every task within their own company --
+            # never another organization's internal task list.
+            return base.filter(created_by__organization_id=user.organization_id)
         # employees see only tasks they created or were assigned to them
-        return Task.objects.select_related("created_by", "assigned_to").filter(
-            **{"created_by": user}
-        ) | Task.objects.select_related("created_by", "assigned_to").filter(
-            **{"assigned_to": user}
-        )
+        return base.filter(created_by=user) | base.filter(assigned_to=user)
 
     def perform_create(self, serializer):
         user = self.request.user

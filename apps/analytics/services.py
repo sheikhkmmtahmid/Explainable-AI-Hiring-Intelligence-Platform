@@ -40,15 +40,33 @@ def build_pipeline_snapshot(job_id: int) -> dict:
     }
 
 
-def get_platform_summary() -> dict:
+def get_platform_summary(organization_id=None) -> dict:
+    """organization_id=None means platform-wide -- callers must only pass
+    None for platform staff, this function trusts its input."""
+    from django.db.models import Q
+
     from apps.candidates.models import Candidate
     from apps.jobs.models import JobPost
 
+    jobs = JobPost.objects.all()
+    applications = Application.objects.all()
+    matches = MatchResult.objects.all()
+    candidates = Candidate.objects.all()
+
+    if organization_id is not None:
+        jobs = jobs.filter(organization_id=organization_id)
+        applications = applications.filter(job__organization_id=organization_id)
+        matches = matches.filter(job__organization_id=organization_id)
+        candidates = candidates.filter(
+            Q(sourced_by_organization_id=organization_id)
+            | Q(applications__job__organization_id=organization_id)
+        ).distinct()
+
     return {
-        "total_candidates": Candidate.objects.count(),
-        "synthetic_candidates": Candidate.objects.filter(is_synthetic=True).count(),
-        "total_jobs": JobPost.objects.count(),
-        "active_jobs": JobPost.objects.filter(status="active").count(),
-        "total_applications": Application.objects.count(),
-        "total_matches": MatchResult.objects.count(),
+        "total_candidates": candidates.count(),
+        "synthetic_candidates": candidates.filter(is_synthetic=True).count(),
+        "total_jobs": jobs.count(),
+        "active_jobs": jobs.filter(status="active").count(),
+        "total_applications": applications.count(),
+        "total_matches": matches.count(),
     }
