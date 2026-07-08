@@ -2,6 +2,8 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.matching.views import _check_job_access
+
 from .models import FairnessReport, SubgroupMetric
 from .serializers import FairnessReportSerializer
 from .services import compute_fairness_report
@@ -13,10 +15,12 @@ class FairnessReportView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, job_id):
+        _check_job_access(request.user, job_id)
         reports = FairnessReport.objects.filter(job_id=job_id).prefetch_related("subgroups")
         return Response(FairnessReportSerializer(reports, many=True).data)
 
     def post(self, request, job_id):
+        _check_job_access(request.user, job_id)
         attr = request.data.get("protected_attribute", "gender")
         if attr not in ALLOWED_ATTRIBUTES:
             return Response(

@@ -2,6 +2,10 @@ from django.db import models
 
 
 class FairnessReport(models.Model):
+    class Basis(models.TextChoices):
+        ACTUAL_DECISIONS = "actual_decisions", "Actual hiring decisions"
+        AI_RANK_PROVISIONAL = "ai_rank_provisional", "AI ranking (provisional -- no decisions recorded yet)"
+
     job = models.ForeignKey(
         "jobs.JobPost", on_delete=models.CASCADE, related_name="fairness_reports"
     )
@@ -10,6 +14,7 @@ class FairnessReport(models.Model):
     disparate_impact_ratio = models.FloatField(null=True, blank=True)
     selection_rate_overall = models.FloatField(null=True, blank=True)
     bias_flag = models.BooleanField(default=False)
+    basis = models.CharField(max_length=25, choices=Basis.choices, default=Basis.AI_RANK_PROVISIONAL)
     generated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

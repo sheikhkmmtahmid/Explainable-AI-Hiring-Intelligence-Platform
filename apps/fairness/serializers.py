@@ -39,7 +39,7 @@ class FairnessReportSerializer(serializers.ModelSerializer):
         fields = [
             "id", "job", "protected_attribute",
             "disparate_impact", "disparate_impact_ratio",
-            "selection_rate_overall", "bias_flag", "bias_detected",
+            "selection_rate_overall", "bias_flag", "bias_detected", "basis",
             "demographic_parity_difference",
             "subgroups", "generated_at",
         ]
