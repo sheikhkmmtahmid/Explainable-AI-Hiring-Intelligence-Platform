@@ -53,13 +53,34 @@ class Command(BaseCommand):
             raise CommandError(str(exc))
 
         self.stdout.write(self.style.SUCCESS("\nTraining complete."))
-        self.stdout.write(f"  Samples used   : {summary['n_samples']}")
+        self.stdout.write(f"  Samples used    : {summary['n_samples']}")
         self.stdout.write(f"  Hired (positive): {summary['n_positive']}")
-        self.stdout.write(f"  Not hired      : {summary['n_negative']}")
-        self.stdout.write(f"  Accuracy       : {summary['accuracy']:.2%}")
-        if summary.get("roc_auc"):
-            self.stdout.write(f"  ROC-AUC        : {summary['roc_auc']:.4f}")
-        self.stdout.write(f"  Model saved to : {summary['model_path']}")
+        self.stdout.write(f"  Not hired       : {summary['n_negative']}")
+        if summary.get("cv_folds"):
+            self.stdout.write(f"\n  Cross-validated ({summary['cv_folds']}-fold, stratified):")
+            if summary.get("roc_auc_mean") is not None:
+                self.stdout.write(
+                    f"    ROC-AUC        : {summary['roc_auc_mean']:.4f} ± {summary['roc_auc_std']:.4f}"
+                )
+            if summary.get("pr_auc_mean") is not None:
+                self.stdout.write(
+                    f"    PR-AUC         : {summary['pr_auc_mean']:.4f} ± {summary['pr_auc_std']:.4f}"
+                    "   (more informative than ROC-AUC under class imbalance)"
+                )
+            if summary.get("precision_mean") is not None:
+                self.stdout.write(f"    Precision      : {summary['precision_mean']:.4f}")
+            if summary.get("recall_mean") is not None:
+                self.stdout.write(f"    Recall         : {summary['recall_mean']:.4f}")
+            if summary.get("f1_mean") is not None:
+                self.stdout.write(f"    F1             : {summary['f1_mean']:.4f}")
+        else:
+            self.stdout.write(
+                self.style.WARNING(
+                    "\n  Too few samples per class for cross-validation -- "
+                    "metrics are not statistically meaningful yet."
+                )
+            )
+        self.stdout.write(f"\n  Model saved to  : {summary['model_path']}")
         self.stdout.write(
             "\nRestart the Django server and Celery workers to activate the new model."
         )
