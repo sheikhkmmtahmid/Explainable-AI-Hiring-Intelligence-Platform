@@ -200,26 +200,29 @@ export default function About() {
               a one-time number I'm asking you to trust blindly.
             </li>
             <li className="text-gray-300 leading-relaxed">
-              <strong className="text-white">GradientBoostingClassifier</strong>: this is the one I want to be most
-              careful about, and I went back and checked it precisely rather than repeating what I'd written before. I
-              pulled the actual training data the currently saved model was trained on: 251 labeled examples, 26 marked
-              hired and 225 marked not hired. Every single one of those 251, all of them, comes from a synthetic
-              candidate matched against a synthetic job. Zero come from a real person. That means any accuracy number
-              this model reports right now would be measuring how well it agrees with this platform's own synthetic
-              hiring simulator, not real hiring behavior, and I'm not going to present that as "model accuracy" because
-              it wouldn't be true. I also found precisely why the one dataset that does have real hiring outcomes, the
-              audit study below with 4,870 real application decisions, isn't reaching this model at all. The code that
-              syncs a hiring outcome onto a match result only runs at the moment an application is saved, and only
-              updates a match result that already exists at that exact instant. Most of those real applications were
-              imported before batch matching had ever run for their jobs, so that sync fired once, found nothing yet to
-              update, and never ran again later when a match result finally existed. The real signal is sitting right
-              there in the database. It just never got wired into what this model actually learns from. That is fixable,
-              narrowly: a direct comparison of those 4,870 real outcomes against match scores, computed on demand rather
-              than through that one-shot sync, would give one honest, narrow, real accuracy number, scoped specifically
-              to a 2001 to 2002 study of entry-level clerical and sales roles in two U.S. cities. I haven't built that
-              yet. Until I do, or until an organization logs enough of its own real hiring decisions to train on
-              responsibly, I'd rather tell you plainly that this model's accuracy is not something I can honestly show
-              you today than publish a number that looks rigorous but isn't.
+              <strong className="text-white">GradientBoostingClassifier</strong>: I want to be extra careful here, so I
+              checked the real numbers instead of just repeating what I said before. The model saved on this platform
+              right now was trained on 251 examples. Of those, 26 are marked as hired and 225 are marked as not hired.
+              All 251 of them are synthetic. None are real people. So if I gave you an accuracy number for this model
+              today, it would only tell you how well it agrees with this platform's own made up hiring simulation, not
+              how well it predicts real hiring. I am not going to call that "accuracy," because it would not be true.
+            </li>
+            <li className="text-gray-300 leading-relaxed">
+              Here is the part I actually dug into. There is one dataset with real hiring outcomes: the audit study
+              described further down this page, with 4,870 real decisions. That data is sitting in the database. It
+              just never made it into this model's training, and I found out exactly why. A small piece of code copies
+              a real hiring outcome onto a match score, but it only runs the moment someone applies to a job, and only
+              if a match score for that person already exists at that exact moment. For most of these real
+              applications, matching had not run yet when they were imported, so that copy step found nothing to
+              update and never tried again later.
+            </li>
+            <li className="text-gray-300 leading-relaxed">
+              This is fixable. I could compare those 4,870 real outcomes directly against match scores instead of
+              relying on that one time copy step, which would give one honest, narrow, real accuracy number. It would
+              only cover a 2001 to 2002 study of entry level clerical and sales jobs in two U.S. cities, so it would
+              not be a broad claim, but it would be real. I have not built that yet. Until I do, or until a company
+              using this platform logs enough real hiring decisions of its own, I would rather tell you plainly that I
+              cannot show you this model's accuracy today than give you a number that looks solid but is not.
             </li>
             <li className="text-gray-300 leading-relaxed">
               <strong className="text-white">The name-bias probe</strong>: unlike the classifier above, this one has a
