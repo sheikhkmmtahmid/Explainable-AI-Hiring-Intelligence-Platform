@@ -87,6 +87,19 @@ class Candidate(models.Model):
 
     # Metadata
     is_synthetic = models.BooleanField(default=False)
+    # Which real-world dataset this candidate was imported from, if any --
+    # blank for real user signups, "synthetic" is tracked separately via
+    # is_synthetic rather than here. See apps/ingestion/management/commands/.
+    source = models.CharField(max_length=30, blank=True, default="")
+    # Row identifier from the source dataset (e.g. Djinni's "id"), so a
+    # re-run of an importer can skip rows it already created instead of
+    # duplicating them -- mirrors JobPost.external_id.
+    external_id = models.CharField(max_length=255, blank=True, default="")
+    # SHA-256 of normalised raw_cv_text, checked before creating a new
+    # imported candidate so the same real resume never gets imported twice
+    # -- either re-run of the same source, or genuine overlap between two
+    # different public datasets (e.g. two sources both scraping livecareer.com).
+    content_hash = models.CharField(max_length=64, blank=True, default="", db_index=True)
     raw_cv_text = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

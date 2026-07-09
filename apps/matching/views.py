@@ -64,3 +64,47 @@ class TopCandidatesView(APIView):
         top_n = int(request.query_params.get("n", settings.TOP_N_CANDIDATES))
         results = MatchResult.objects.filter(job_id=job_id).order_by("rank")[:top_n]
         return Response(MatchResultSerializer(results, many=True).data)
+
+
+def _resolve_organization_id(request):
+    """An org-scoped user always resolves to their own organization. Platform
+    staff have no organization of their own, so they resolve one from an
+    explicit organization_id, or from a job_id (whichever job they're
+    currently looking at on the fairness dashboard) -- matching how this
+    view actually gets used, rather than forcing platform staff to look up
+    and pass a raw organization id by hand."""
+    user = request.user
+    if not user.is_platform_staff:
+        return user.organization_id
+
+    org_id = request.query_params.get("organization_id")
+    if org_id:
+        return int(org_id)
+
+    job_id = request.query_params.get("job_id")
+    if job_id:
+        from apps.jobs.models import JobPost
+        job = JobPost.objects.filter(id=job_id).only("organization_id").first()
+        return job.organization_id if job else None
+
+    return None
+
+
+class MatchingConfidenceView(APIView):
+    """How much real decision data backs this organization's matching --
+    see apps.matching.services.get_matching_confidence for what the tiers
+    mean and why this exists (there is no per-org trained model yet, so
+    every organization currently runs on the same fixed-weight scorer
+    regardless of how much real history they have)."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        org_id = _resolve_organization_id(request)
+        if not org_id:
+            return Response(
+                {"detail": "Could not determine an organization (pass job_id or organization_id)."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from .services import get_matching_confidence
+        return Response(get_matching_confidence(org_id))

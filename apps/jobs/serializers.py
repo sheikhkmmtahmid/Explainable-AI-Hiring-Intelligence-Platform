@@ -72,5 +72,5 @@ class JobPostListSerializer(serializers.ModelSerializer):
         fields = [
             "id", "organization_name", "title", "company", "country", "city", "work_model",
             "employment_type", "experience_level", "salary_min", "salary_max",
-            "salary_currency", "status", "posted_at", "source",
+            "salary_currency", "status", "posted_at", "source", "is_synthetic",
         ]

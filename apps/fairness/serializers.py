@@ -33,6 +33,7 @@ class FairnessReportSerializer(serializers.ModelSerializer):
     disparate_impact         = serializers.FloatField(source="disparate_impact_ratio", allow_null=True)
     bias_detected            = serializers.BooleanField(source="bias_flag")
     demographic_parity_difference = serializers.SerializerMethodField()
+    eeoc_benchmark = serializers.SerializerMethodField()
 
     class Meta:
         model = FairnessReport
@@ -40,7 +41,7 @@ class FairnessReportSerializer(serializers.ModelSerializer):
             "id", "job", "protected_attribute",
             "disparate_impact", "disparate_impact_ratio",
             "selection_rate_overall", "bias_flag", "bias_detected", "basis",
-            "demographic_parity_difference",
+            "demographic_parity_difference", "eeoc_benchmark",
             "subgroups", "generated_at",
         ]
         read_only_fields = fields
@@ -50,3 +51,12 @@ class FairnessReportSerializer(serializers.ModelSerializer):
         if len(rates) < 2:
             return 0.0
         return round(float(max(rates)) - float(min(rates)), 4)
+
+    def get_eeoc_benchmark(self, obj):
+        from ml.fairness.eeoc_benchmarks import compare_to_eeoc_benchmark
+
+        subgroup_data = {
+            s.group_value: {"selection_rate": float(s.selection_rate)}
+            for s in obj.subgroups.all()
+        }
+        return compare_to_eeoc_benchmark(obj.protected_attribute, subgroup_data)

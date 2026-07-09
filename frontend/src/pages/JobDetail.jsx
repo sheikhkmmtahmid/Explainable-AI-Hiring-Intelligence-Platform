@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, MapPin, Briefcase, Zap, BarChart3, ChevronRight, RefreshCw, Pencil, Trash2, X, Check, ClipboardList, Users } from 'lucide-react'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -54,6 +54,9 @@ export default function JobDetail() {
   const [loadingMatches, setLoadingMatches] = useState(false)
   const [loadingApplications, setLoadingApplications] = useState(true)
   const [triggering, setTriggering] = useState(false)
+  const [polling, setPolling]       = useState(false)
+  const pollTimer = useRef(null)
+  const mounted = useRef(true)
   const [editing, setEditing]       = useState(false)
   const [saving, setSaving]         = useState(false)
   const [form, setForm]             = useState({})
@@ -66,6 +69,14 @@ export default function JobDetail() {
     fetchMatches()
     fetchApplications()
   }, [id])
+
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      clearTimeout(pollTimer.current)
+    }
+  }, [])
 
   const fetchApplications = () => {
     setLoadingApplications(true)
@@ -92,12 +103,43 @@ export default function JobDetail() {
     getTopCandidates(id, 20).then(({ data }) => setMatches(data)).catch(() => {}).finally(() => setLoadingMatches(false))
   }
 
+  // Batch matching scores this job against the entire candidate pool
+  // (tens of thousands of rows now that real datasets are imported), so it
+  // can take well over a minute -- a single delayed check isn't enough.
+  // Poll every 5s for up to 2 minutes and stop as soon as results land.
+  const POLL_INTERVAL_MS = 5000
+  const POLL_MAX_ATTEMPTS = 24
+
+  const pollForMatches = (attempt = 1) => {
+    getTopCandidates(id, 20)
+      .then(({ data }) => {
+        if (!mounted.current) return
+        if (data.length > 0) {
+          setMatches(data)
+          setPolling(false)
+          toast.success('Matching complete!')
+          return
+        }
+        if (attempt >= POLL_MAX_ATTEMPTS) {
+          setPolling(false)
+          toast.error('Matching is taking longer than expected. Refresh in a bit to check again.')
+          return
+        }
+        pollTimer.current = setTimeout(() => pollForMatches(attempt + 1), POLL_INTERVAL_MS)
+      })
+      .catch(() => {
+        if (!mounted.current) return
+        setPolling(false)
+      })
+  }
+
   const handleTrigger = async () => {
     setTriggering(true)
     try {
       await triggerMatching(id)
-      toast.success('Matching queued! Results will appear shortly.')
-      setTimeout(fetchMatches, 3000)
+      toast.success('Matching queued! This can take a minute or two for the full candidate pool.')
+      setPolling(true)
+      pollTimer.current = setTimeout(() => pollForMatches(1), POLL_INTERVAL_MS)
     } catch { toast.error('Failed to trigger matching') }
     finally { setTriggering(false) }
   }
@@ -316,8 +358,8 @@ export default function JobDetail() {
                 <ClipboardList className="w-4 h-4" /> View Applications
               </Link>
               <button onClick={fetchMatches} className="btn-secondary text-sm"><RefreshCw className="w-4 h-4" /></button>
-              <button onClick={handleTrigger} disabled={triggering} className="btn-primary text-sm">
-                <Zap className="w-4 h-4" /> {triggering ? 'Queuing…' : 'Run Matching'}
+              <button onClick={handleTrigger} disabled={triggering || polling} className="btn-primary text-sm">
+                <Zap className="w-4 h-4" /> {triggering ? 'Queuing…' : polling ? 'Matching…' : 'Run Matching'}
               </button>
               <button onClick={startEdit} className="btn-secondary text-sm"><Pencil className="w-4 h-4" /> Edit</button>
               <button onClick={() => setConfirmDelete(true)} className="btn-ghost text-sm text-scarlet-400 hover:bg-scarlet-500/10 border border-scarlet-500/20">
@@ -443,6 +485,12 @@ export default function JobDetail() {
 
           {loadingMatches ? (
             <LoadingSpinner className="py-12" />
+          ) : polling ? (
+            <div className="text-center py-12">
+              <LoadingSpinner className="pb-3" />
+              <p className="text-gray-500 text-sm">Matching against the candidate pool…</p>
+              <p className="text-gray-600 text-xs mt-1">This can take a minute or two for a large pool. Results will appear here automatically.</p>
+            </div>
           ) : matches.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-gray-500 text-sm">No match results yet.</p>

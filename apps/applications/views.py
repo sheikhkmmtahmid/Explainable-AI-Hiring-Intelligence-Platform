@@ -56,6 +56,7 @@ class ApplicationViewSet(ModelViewSet):
     @action(detail=True, methods=["patch"])
     def update_status(self, request, pk=None):
         from .models import ApplicationStatusHistory
+        from .override_tracking import compute_override
 
         application = self.get_object()
         new_status = request.data.get("status")
@@ -67,9 +68,11 @@ class ApplicationViewSet(ModelViewSet):
         application.reviewed_at = timezone.now()
         application.save(update_fields=["status", "reviewed_by", "reviewed_at"])
         if new_status != previous_status:
+            is_override, percentile = compute_override(application, new_status)
             ApplicationStatusHistory.objects.create(
                 application=application, from_status=previous_status,
                 to_status=new_status, changed_by=request.user,
+                is_override=is_override, candidate_percentile_at_decision=percentile,
             )
         return Response(ApplicationSerializer(application).data)
 

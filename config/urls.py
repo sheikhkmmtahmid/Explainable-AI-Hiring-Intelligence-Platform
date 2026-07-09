@@ -4,6 +4,8 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.views.generic import TemplateView
 
+from .health import health_check
+
 api_v1_patterns = [
     path("auth/", include("apps.accounts.urls")),
     path("candidates/", include("apps.candidates.urls")),
@@ -23,6 +25,7 @@ api_v1_patterns = [
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("healthz/", health_check, name="health-check"),
     path("api/v1/", include(api_v1_patterns)),
     re_path(r"^.*$", TemplateView.as_view(template_name="index.html")),
 ]

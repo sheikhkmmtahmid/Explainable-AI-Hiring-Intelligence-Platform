@@ -23,6 +23,8 @@ import CreateUser from './pages/CreateUser'
 import SkillModeration from './pages/SkillModeration'
 import Billing from './pages/Billing'
 import BillingModeration from './pages/BillingModeration'
+import About from './pages/About'
+import Governance from './pages/Governance'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -40,6 +42,8 @@ function AppRoutes() {
       {/* Public routes */}
       <Route path="/login"    element={user ? <Navigate to="/" replace /> : <Login />} />
       <Route path="/register" element={user ? <Navigate to="/" replace /> : <Register />} />
+      <Route path="/about"    element={<About />} />
+      <Route path="/governance" element={<Governance />} />
 
       {/* Core app */}
       <Route path="/"          element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />

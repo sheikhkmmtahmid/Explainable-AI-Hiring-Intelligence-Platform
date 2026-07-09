@@ -1,26 +1,53 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
-import { AlertTriangle, CheckCircle2, RefreshCw } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, RefreshCw, Gauge, GitCompare, Scale, Search } from 'lucide-react'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { getJobs } from '../api/jobs'
-import { getFairnessReport, generateFairnessReport } from '../api/fairness'
+import { getFairnessReport, generateFairnessReport, getOverrideSummary } from '../api/fairness'
+import { getMatchingConfidence } from '../api/matching'
 import toast from 'react-hot-toast'
 
 const ATTRIBUTES = ['gender', 'age_range', 'ethnicity', 'disability_status']
 
+const CONFIDENCE_STYLES = {
+  no_data:      { label: 'No real decisions yet', color: 'text-gray-400' },
+  very_early:   { label: 'Very early', color: 'text-scarlet-400' },
+  early_signal: { label: 'Early signal', color: 'text-gold-400' },
+  building:     { label: 'Building confidence', color: 'text-blue-400' },
+  calibrated:   { label: 'Calibrated', color: 'text-emerald-400' },
+}
+
 export default function FairnessDashboard() {
   const [jobs, setJobs] = useState([])
   const [selectedJob, setSelectedJob] = useState('')
+  const [selectedJobLabel, setSelectedJobLabel] = useState('')
+  const [jobQuery, setJobQuery] = useState('')
+  const [jobOptions, setJobOptions] = useState([])
+  const [searchingJobs, setSearchingJobs] = useState(false)
+  const [jobDropdownOpen, setJobDropdownOpen] = useState(false)
+  const jobComboRef = useRef(null)
   const [attribute, setAttribute] = useState('gender')
   const [reports, setReports] = useState([])
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
+  const [confidence, setConfidence] = useState(null)
+  const [overrideSummary, setOverrideSummary] = useState(null)
+
+  const labelFor = (j) => `${j.title} at ${j.company}`
 
   useEffect(() => {
-    // Load manual jobs first so they appear at the top, then fill with other active jobs
+    // Load manual jobs first so they appear at the top, then fill with other
+    // active jobs. Ordered by -created_at (not -posted_at): real imported
+    // datasets carry their true, often much older or null, original posted
+    // date, so sorting by -posted_at buries every real job under a full page
+    // of recently-generated synthetic ones. This is the same fix already
+    // applied in JobList.jsx for the same reason. Search below (which hits
+    // the backend directly, unbounded by this initial page) is what makes
+    // any specific real job -- e.g. the OpenIntro audit study jobs -- reachable
+    // even if it isn't among the first 100 shown by default.
     Promise.all([
       getJobs({ source: 'manual', ordering: '-created_at', page_size: 100 }),
-      getJobs({ status: 'active', ordering: '-posted_at', page_size: 100 }),
+      getJobs({ status: 'active', ordering: '-created_at', page_size: 100 }),
     ]).then(([manual, active]) => {
       const manualList = manual.data.results ?? manual.data
       const activeList = active.data.results ?? active.data
@@ -28,9 +55,46 @@ export default function FairnessDashboard() {
       const manualIds = new Set(manualList.map(j => j.id))
       const merged = [...manualList, ...activeList.filter(j => !manualIds.has(j.id))]
       setJobs(merged)
-      if (merged.length > 0) setSelectedJob(String(merged[0].id))
+      if (merged.length > 0) {
+        setSelectedJob(String(merged[0].id))
+        setSelectedJobLabel(labelFor(merged[0]))
+      }
     })
   }, [])
+
+  // Live search across the whole job pool (no source/status/ordering
+  // restriction), so any real-dataset job is findable by title or company
+  // even when it wouldn't make the default 100-row list above.
+  useEffect(() => {
+    const q = jobQuery.trim()
+    if (!q) { setJobOptions([]); setSearchingJobs(false); return }
+    setSearchingJobs(true)
+    const timer = setTimeout(() => {
+      getJobs({ search: q, page_size: 20 })
+        .then(({ data }) => setJobOptions(data.results ?? data))
+        .catch(() => setJobOptions([]))
+        .finally(() => setSearchingJobs(false))
+    }, 250)
+    return () => clearTimeout(timer)
+  }, [jobQuery])
+
+  useEffect(() => {
+    const onClickOutside = (e) => {
+      if (jobComboRef.current && !jobComboRef.current.contains(e.target)) setJobDropdownOpen(false)
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [])
+
+  const pickJob = (j) => {
+    setSelectedJob(String(j.id))
+    setSelectedJobLabel(labelFor(j))
+    setJobQuery('')
+    setJobOptions([])
+    setJobDropdownOpen(false)
+  }
+
+  const visibleJobOptions = jobQuery.trim() ? jobOptions : jobs
 
   useEffect(() => {
     if (!selectedJob) return
@@ -39,6 +103,8 @@ export default function FairnessDashboard() {
       .then(({ data }) => setReports(Array.isArray(data) ? data : [data]))
       .catch(() => setReports([]))
       .finally(() => setLoading(false))
+    getMatchingConfidence(selectedJob).then(({ data }) => setConfidence(data)).catch(() => setConfidence(null))
+    getOverrideSummary(selectedJob).then(({ data }) => setOverrideSummary(data)).catch(() => setOverrideSummary(null))
   }, [selectedJob])
 
   const generate = async () => {
@@ -74,14 +140,78 @@ export default function FairnessDashboard() {
         <p className="text-gray-500 text-sm mt-1">Monitor hiring equity across demographic groups</p>
       </div>
 
+      {/* Matching confidence + override rate */}
+      {(confidence || overrideSummary) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {confidence && (
+            <div className="card p-5">
+              <div className="flex items-center gap-2 mb-1">
+                <Gauge className="w-4 h-4 text-gray-500" />
+                <p className="text-xs text-gray-500 uppercase tracking-wide">Matching Confidence</p>
+              </div>
+              <p className={`text-xl font-bold ${CONFIDENCE_STYLES[confidence.confidence_tier]?.color ?? 'text-white'}`}>
+                {CONFIDENCE_STYLES[confidence.confidence_tier]?.label ?? confidence.confidence_tier}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                {confidence.real_decision_count.toLocaleString()} real decisions logged so far. {confidence.description}
+              </p>
+            </div>
+          )}
+          {overrideSummary && overrideSummary.total_decisions > 0 && (
+            <div className="card p-5">
+              <div className="flex items-center gap-2 mb-1">
+                <GitCompare className="w-4 h-4 text-gray-500" />
+                <p className="text-xs text-gray-500 uppercase tracking-wide">Recruiter Override Rate</p>
+              </div>
+              <p className="text-xl font-bold text-white">
+                {(overrideSummary.override_rate * 100).toFixed(1)}%
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Of {overrideSummary.total_decisions.toLocaleString()} decisions with a computable AI rank, this
+                fraction went against what the ranking would have suggested. Not right or wrong on its own, but worth
+                watching if it differs a lot across candidate groups.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Controls */}
       <div className="card p-5">
         <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-3">
-          <div className="flex-1 min-w-0 sm:min-w-48">
+          <div ref={jobComboRef} className="relative flex-1 min-w-0 sm:min-w-48">
             <label className="label">Job Position</label>
-            <select className="input" value={selectedJob} onChange={e => setSelectedJob(e.target.value)}>
-              {jobs.map(j => <option key={j.id} value={j.id}>{j.title} — {j.company}</option>)}
-            </select>
+            <div className="relative">
+              <Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                className="input pl-9"
+                placeholder="Search any job by title or company…"
+                value={jobDropdownOpen ? jobQuery : selectedJobLabel}
+                onChange={(e) => { setJobQuery(e.target.value); setJobDropdownOpen(true) }}
+                onFocus={() => { setJobQuery(''); setJobDropdownOpen(true) }}
+              />
+            </div>
+            {jobDropdownOpen && (
+              <div className="absolute z-20 mt-1 w-full card max-h-72 overflow-y-auto shadow-lg">
+                {searchingJobs ? (
+                  <p className="px-3 py-2 text-xs text-gray-500">Searching…</p>
+                ) : visibleJobOptions.length === 0 ? (
+                  <p className="px-3 py-2 text-xs text-gray-500">No jobs match "{jobQuery}".</p>
+                ) : (
+                  visibleJobOptions.map(j => (
+                    <button
+                      type="button"
+                      key={j.id}
+                      onClick={() => pickJob(j)}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-surface-600 transition-colors flex items-center justify-between gap-2"
+                    >
+                      <span className="truncate">{j.title} at {j.company}</span>
+                      {!j.is_synthetic && <span className="badge text-xs bg-surface-500 text-gray-500 flex-shrink-0">real</span>}
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
           </div>
           <div className="sm:w-44">
             <label className="label">Protected Attribute</label>
@@ -109,7 +239,7 @@ export default function FairnessDashboard() {
             <div className="card p-4 border-gold-500/30 bg-gold-500/5 flex items-start gap-3">
               <AlertTriangle className="w-5 h-5 text-gold-400 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-medium text-gold-400">Provisional estimate — not yet based on real decisions</p>
+                <p className="text-sm font-medium text-gold-400">Provisional estimate, not yet based on real decisions</p>
                 <p className="text-xs text-gray-400 mt-0.5">
                   No candidates for this job have reached a shortlisted/interviewed/hired/rejected status yet, so this
                   report estimates fairness from the AI's ranking alone. Once recruiters start making real decisions on
@@ -121,7 +251,7 @@ export default function FairnessDashboard() {
             <div className="card p-4 border-emerald-500/30 bg-emerald-500/5 flex items-start gap-3">
               <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
               <p className="text-sm text-emerald-400">
-                Based on actual recruiter decisions (shortlisted / interviewed / offered / hired vs. rejected) — this audits what really happened, not just the AI's ranking.
+                Based on actual recruiter decisions (shortlisted, interviewed, offered, or hired versus rejected). This audits what really happened, not just the AI's ranking.
               </p>
             </div>
           )}
@@ -209,6 +339,35 @@ export default function FairnessDashboard() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          )}
+
+          {/* EEOC benchmark */}
+          {activeReport.eeoc_benchmark?.supported && Object.keys(activeReport.eeoc_benchmark.groups).length > 0 && (
+            <div className="card p-5">
+              <div className="flex items-center gap-2 mb-1">
+                <Scale className="w-4 h-4 text-gray-500" />
+                <h2 className="section-title">Compared to national EEOC workforce data</h2>
+              </div>
+              <p className="text-xs text-gray-500 mb-4">{activeReport.eeoc_benchmark.note}</p>
+              <div className="space-y-2">
+                {Object.entries(activeReport.eeoc_benchmark.groups).map(([group, data]) => (
+                  <div key={group} className="flex items-center justify-between text-sm px-3 py-2 rounded-lg bg-surface-600">
+                    <span className="text-white capitalize">{group}</span>
+                    <span className="text-gray-400">
+                      Your rate: <span className="text-white">{data.organization_selection_rate_pct}%</span>
+                      {'  '}vs national workforce: <span className="text-white">{data.eeoc_national_workforce_pct}%</span>
+                      {'  '}
+                      <span className={data.gap_percentage_points >= 0 ? 'text-emerald-400' : 'text-scarlet-400'}>
+                        ({data.gap_percentage_points >= 0 ? '+' : ''}{data.gap_percentage_points} pts)
+                      </span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-gray-600 mt-3">
+                Source: EEOC 2018 EEO-1 national aggregate data, {activeReport.eeoc_benchmark.source_year}.
+              </p>
             </div>
           )}
         </>

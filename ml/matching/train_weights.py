@@ -253,25 +253,36 @@ def main():
     parser.add_argument("--scenario", help="Only use applications from a specific bias scenario (by name substring)")
     parser.add_argument("--min-samples", type=int, default=100, help="Minimum labelled samples required (default: 100)")
     parser.add_argument("--evaluate", action="store_true", help="Run 5-fold cross-validation")
+    parser.add_argument(
+        "--include-synthetic", action="store_true",
+        help="Train on synthetic applications too. WARNING: the synthetic generator deliberately "
+             "decorrelates semantic_score from its hired/shortlisted label (it's a bias-testing "
+             "fixture, not a matching-quality signal) -- training on synthetic data alone will "
+             "learn to zero out semantic_score. Only use this to inspect/debug the generator "
+             "itself, never to produce weights for production use.",
+    )
     args = parser.parse_args()
 
     from apps.applications.models import Application
 
-    qs = Application.objects.filter(
-        is_synthetic=True,
-    ).select_related("candidate", "job")
+    qs = Application.objects.select_related("candidate", "job")
+    qs = qs.filter(is_synthetic=True) if args.include_synthetic else qs.filter(is_synthetic=False)
 
     if args.scenario:
         qs = qs.filter(recruiter_notes__icontains=args.scenario)
 
     applications = list(qs)
-    logger.info("Loaded %d synthetic applications", len(applications))
+    logger.info(
+        "Loaded %d %s applications",
+        len(applications), "synthetic" if args.include_synthetic else "real",
+    )
 
     if len(applications) < args.min_samples:
         logger.error(
-            "Not enough labelled data: %d samples (minimum: %d). "
-            "Generate synthetic applications first:\n"
-            "  POST /api/v1/synthetic/generate/ {\"kind\": \"applications\", \"scenario\": \"no_bias\"}",
+            "Not enough labelled data: %d real applications (minimum: %d). "
+            "This is expected until an organization has made enough real hiring "
+            "decisions -- there is no shortcut here (see --include-synthetic's "
+            "warning for why synthetic data can't substitute for this).",
             len(applications), args.min_samples,
         )
         sys.exit(1)

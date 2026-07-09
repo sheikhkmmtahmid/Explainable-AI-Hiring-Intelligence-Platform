@@ -52,6 +52,7 @@ frontend/.env.local
 # Data files
 data/test_cvs/
 data/kaggle/
+data/dataset_cache/
 
 # ML models (trained, regenerated locally)
 ml/models/*.joblib

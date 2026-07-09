@@ -59,6 +59,18 @@ class JobPost(models.Model):
     experience_level = models.CharField(
         max_length=20, choices=ExperienceLevel.choices, default=ExperienceLevel.MID
     )
+    # Blank means "no stated requirement" -- compute_education_score()
+    # treats that as automatically satisfied rather than assuming every job
+    # needs a bachelor's degree, which real jobs (retail, hospitality, trades)
+    # frequently don't.
+    required_education = models.CharField(
+        max_length=20,
+        choices=[
+            ("high_school", "High School"), ("associate", "Associate"),
+            ("bachelor", "Bachelor's"), ("master", "Master's"), ("phd", "PhD"),
+        ],
+        blank=True, default="",
+    )
 
     # Compensation
     salary_min = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
@@ -76,11 +88,19 @@ class JobPost(models.Model):
         choices=[
             ("manual", "Manual"), ("adzuna", "Adzuna"), ("jooble", "Jooble"),
             ("the_muse", "The Muse"), ("synthetic", "Synthetic"), ("kaggle", "Kaggle"),
+            ("emscad", "EMSCAD (Kaggle)"), ("jobsam", "jobs.am (Kaggle)"),
+            ("linkedin", "LinkedIn Job Postings (Kaggle)"), ("djinni", "Djinni (HuggingFace)"),
+            ("openintro", "Audit Study 2004 (OpenIntro)"),
         ],
         default="manual",
     )
     external_id = models.CharField(max_length=255, blank=True)
     external_url = models.URLField(blank=True)
+    # SHA-256 of normalised title+description, checked before creating a new
+    # imported job so the same real posting never gets imported twice --
+    # either a re-run of the same source, or genuine overlap between two
+    # different public datasets.
+    content_hash = models.CharField(max_length=64, blank=True, default="", db_index=True)
 
     # Creator
     created_by = models.ForeignKey(

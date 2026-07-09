@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import LogoIcon from '../components/LogoIcon'
@@ -106,6 +106,10 @@ export default function Login() {
 
         <p className="text-center text-xs text-gray-600 mt-6">
           Powered by SBERT · SHAP · LIME
+          {'  ·  '}
+          <Link to="/about" className="text-gray-500 hover:text-scarlet-400 transition-colors underline decoration-gray-700">
+            About &amp; data sources
+          </Link>
         </p>
       </div>
     </div>

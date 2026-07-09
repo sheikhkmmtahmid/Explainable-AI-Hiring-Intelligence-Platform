@@ -1,9 +1,11 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Plus, Search, Briefcase, MapPin, ArrowRight } from 'lucide-react'
+import { Plus, Search, Briefcase, MapPin, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react'
 import LoadingSpinner from '../components/LoadingSpinner'
 import EmptyState from '../components/EmptyState'
 import { getJobs } from '../api/jobs'
+
+const PAGE_SIZE = 50
 
 const EMP_LABELS = {
   full_time: 'Full-time', part_time: 'Part-time',
@@ -16,10 +18,17 @@ const STATUS_STYLES = {
   filled: 'bg-blue-500/15 text-blue-400',
 }
 
+// Real-world job postings (imported from public datasets or posted through
+// the platform) carry their true original posted_at date, which is often
+// years older than synthetic data's -- ordering those tabs by -created_at
+// (when the row entered this database) instead of -posted_at keeps them
+// reachable instead of buried under every synthetic listing.
 const TABS = [
-  { key: 'manual',    label: 'My Jobs',   params: { source: 'manual', ordering: '-created_at' } },
-  { key: 'active',    label: 'Active',    params: { status: 'active', ordering: '-posted_at'  } },
-  { key: 'all',       label: 'All Jobs',  params: { ordering: '-posted_at' } },
+  { key: 'manual',    label: 'My Jobs',    params: { source: 'manual', ordering: '-created_at' } },
+  { key: 'active',    label: 'Active',     params: { status: 'active', ordering: '-posted_at'  } },
+  { key: 'real',      label: 'Real Data',  params: { is_synthetic: false, ordering: '-created_at' } },
+  { key: 'synthetic', label: 'Synthetic',  params: { is_synthetic: true,  ordering: '-posted_at'  } },
+  { key: 'all',       label: 'All Jobs',   params: { ordering: '-posted_at' } },
 ]
 
 export default function JobList() {
@@ -28,26 +37,48 @@ export default function JobList() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch]   = useState(searchParams.get('q') ?? '')
   const [tab, setTab]         = useState(searchParams.get('tab') ?? 'manual')
+  const [page, setPage]       = useState(Number(searchParams.get('page')) || 1)
+  const [total, setTotal]     = useState(0)
+
+  const tabParams = TABS.find(t => t.key === tab)?.params ?? {}
+  const totalPages = Math.ceil(total / PAGE_SIZE)
 
   const fetchJobs = useCallback(() => {
     setLoading(true)
-    const tabParams = TABS.find(t => t.key === tab)?.params ?? {}
-    getJobs({ search: search || undefined, page_size: 100, ...tabParams })
-      .then(({ data }) => setJobs(data.results ?? data))
+    getJobs({ search: search || undefined, page_size: PAGE_SIZE, page, ...tabParams })
+      .then(({ data }) => {
+        const results = data.results ?? data
+        setJobs(results)
+        setTotal(data.count ?? results.length)
+      })
       .finally(() => setLoading(false))
-  }, [search, tab])
+  }, [search, tab, page])
 
   useEffect(() => { fetchJobs() }, [fetchJobs])
 
+  const syncParams = (next) => {
+    const params = { tab: next.tab ?? tab }
+    const q = next.search ?? search
+    const p = next.page ?? page
+    if (q) params.q = q
+    if (p > 1) params.page = String(p)
+    setSearchParams(params)
+  }
+
   const selectTab = (key) => {
-    setTab(key)
-    setSearch('')
-    setSearchParams({ tab: key })
+    setTab(key); setPage(1); setSearch('')
+    syncParams({ tab: key, search: '', page: 1 })
   }
 
   const onSearchChange = (value) => {
-    setSearch(value)
-    setSearchParams(value ? { tab, q: value } : { tab })
+    setSearch(value); setPage(1)
+    syncParams({ search: value, page: 1 })
+  }
+
+  const goPage = (p) => {
+    const next = Math.max(1, Math.min(p, totalPages))
+    setPage(next)
+    syncParams({ page: next })
   }
 
   const listReturnTo = `/jobs?${searchParams.toString()}`
@@ -57,7 +88,7 @@ export default function JobList() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="page-title">Jobs</h1>
-          <p className="text-gray-500 text-sm mt-1">{jobs.length} positions</p>
+          <p className="text-gray-500 text-sm mt-1">{total.toLocaleString()} positions</p>
         </div>
         <Link to="/jobs/new" className="btn-primary">
           <Plus className="w-4 h-4" /> Post a Job
@@ -97,15 +128,16 @@ export default function JobList() {
       ) : jobs.length === 0 ? (
         <EmptyState
           icon={Briefcase}
-          title={tab === 'manual' ? 'No manually posted jobs yet' : 'No jobs found'}
-          description={tab === 'manual'
+          title={tab === 'manual' && !search ? 'No manually posted jobs yet' : 'No jobs found'}
+          description={tab === 'manual' && !search
             ? 'Post your first job to start matching candidates against it.'
             : 'Try a different filter or search term.'}
-          action={tab === 'manual'
+          action={tab === 'manual' && !search
             ? <Link to="/jobs/new" className="btn-primary"><Plus className="w-4 h-4" /> Post a Job</Link>
             : null}
         />
       ) : (
+        <>
         <div className="space-y-2">
           {jobs.map(job => (
             <Link
@@ -118,9 +150,14 @@ export default function JobList() {
                   <Briefcase className="w-5 h-5 text-gray-400" />
                 </div>
                 <div className="min-w-0">
-                  <p className="font-semibold text-white group-hover:text-scarlet-400 transition-colors truncate">
-                    {job.title}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-white group-hover:text-scarlet-400 transition-colors truncate">
+                      {job.title}
+                    </p>
+                    {job.is_synthetic && (
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-surface-500 text-gray-500 flex-shrink-0">synthetic</span>
+                    )}
+                  </div>
                   <p className="text-sm text-gray-500 mt-0.5">{job.company}</p>
                   <div className="flex items-center gap-3 mt-1.5 flex-wrap">
                     {(job.city || job.country) && (
@@ -149,6 +186,29 @@ export default function JobList() {
             </Link>
           ))}
         </div>
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-3 pt-2">
+            <button
+              onClick={() => goPage(page - 1)}
+              disabled={page === 1}
+              className="btn-ghost p-2 disabled:opacity-30"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="text-sm text-gray-400">
+              Page {page} of {totalPages.toLocaleString()}
+            </span>
+            <button
+              onClick={() => goPage(page + 1)}
+              disabled={page === totalPages}
+              className="btn-ghost p-2 disabled:opacity-30"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+        </>
       )}
     </div>
   )

@@ -110,9 +110,9 @@ export default function CandidateList() {
       ) : candidates.length === 0 ? (
         <EmptyState
           icon={Users}
-          title={tab === 'real' ? 'No candidates added yet' : 'No candidates found'}
-          description={tab === 'real' ? 'Add your first candidate to get started.' : 'Try a different filter or search term.'}
-          action={tab === 'real' ? <Link to="/candidates/new" className="btn-primary"><Plus className="w-4 h-4" /> Add Candidate</Link> : null}
+          title={tab === 'real' && !search ? 'No candidates added yet' : 'No candidates found'}
+          description={tab === 'real' && !search ? 'Add your first candidate to get started.' : 'Try a different filter or search term.'}
+          action={tab === 'real' && !search ? <Link to="/candidates/new" className="btn-primary"><Plus className="w-4 h-4" /> Add Candidate</Link> : null}
         />
       ) : (
         <>

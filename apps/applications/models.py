@@ -68,6 +68,13 @@ class ApplicationStatusHistory(models.Model):
     )
     changed_at = models.DateTimeField(auto_now_add=True)
 
+    # Did this decision go against what the AI ranking would have
+    # suggested? Null means "not computable" (no MatchResult existed for
+    # this candidate/job yet, so there was nothing to disagree with).
+    # See apps/applications/override_tracking.py for how this is decided.
+    is_override = models.BooleanField(null=True, blank=True)
+    candidate_percentile_at_decision = models.FloatField(null=True, blank=True)
+
     class Meta:
         db_table = "applications_status_history"
         ordering = ["-changed_at"]

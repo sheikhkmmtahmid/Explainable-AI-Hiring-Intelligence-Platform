@@ -15,8 +15,8 @@ class CandidateExperienceInline(admin.TabularInline):
 
 @admin.register(Candidate)
 class CandidateAdmin(admin.ModelAdmin):
-    list_display = ["full_name", "email", "current_title", "country", "years_of_experience", "is_synthetic"]
-    list_filter = ["is_synthetic", "seniority_level", "availability_status", "country"]
+    list_display = ["full_name", "email", "current_title", "country", "years_of_experience", "is_synthetic", "source"]
+    list_filter = ["is_synthetic", "source", "seniority_level", "availability_status", "country"]
     search_fields = ["full_name", "email", "current_title"]
     inlines = [CandidateSkillInline, CandidateExperienceInline]
 

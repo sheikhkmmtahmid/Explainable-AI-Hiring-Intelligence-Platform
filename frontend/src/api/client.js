@@ -8,11 +8,21 @@ client.interceptors.request.use((config) => {
   return config
 })
 
+// A 401 from these endpoints means "wrong credentials" or "no session to
+// refresh", not "session expired mid-use" -- letting the retry-refresh
+// logic below run for them was causing a real bug: a wrong password
+// produced a 401, which triggered a refresh attempt with no valid refresh
+// token, which failed and force-reloaded the page to /login before the
+// user ever saw the "Invalid username or password" toast Login.jsx was
+// about to show. The reload silently ate the error message.
+const AUTH_ENDPOINTS = ['/auth/login/', '/auth/register/', '/auth/token/refresh/']
+
 client.interceptors.response.use(
   (res) => res,
   async (err) => {
     const original = err.config
-    if (err.response?.status === 401 && !original._retry) {
+    const isAuthEndpoint = AUTH_ENDPOINTS.some((path) => original.url?.includes(path))
+    if (err.response?.status === 401 && !original._retry && !isAuthEndpoint) {
       original._retry = true
       try {
         const refresh = localStorage.getItem('refresh_token')

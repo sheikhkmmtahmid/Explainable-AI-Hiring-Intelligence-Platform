@@ -1,7 +1,7 @@
 import { NavLink, Link, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Briefcase, Users,
-  BarChart3, LogOut, X, ClipboardList, UserPlus, Inbox, Sparkles, CreditCard, Landmark,
+  BarChart3, LogOut, X, ClipboardList, UserPlus, Inbox, Sparkles, CreditCard, Landmark, Info,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import LogoIcon from './LogoIcon'
@@ -155,7 +155,15 @@ export default function Sidebar({ onClose }) {
       </nav>
 
       {/* User */}
-      <div className="px-3 py-4 border-t border-surface-400">
+      <div className="px-3 py-4 border-t border-surface-400 space-y-2">
+        <Link
+          to="/about"
+          onClick={onClose}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-500 hover:text-white hover:bg-surface-600 transition-colors"
+        >
+          <Info className="w-3.5 h-3.5 flex-shrink-0" />
+          About &amp; data sources
+        </Link>
         <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-surface-600">
           <div className="w-7 h-7 rounded-full bg-scarlet-500 flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
             {user?.username?.[0]?.toUpperCase() ?? 'U'}

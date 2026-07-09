@@ -11,6 +11,35 @@ from .services import compute_fairness_report
 ALLOWED_ATTRIBUTES = ["gender", "age_range", "ethnicity", "disability_status"]
 
 
+class OverrideSummaryView(APIView):
+    """How often a recruiter's real decision disagreed with the AI's
+    ranking for that job, optionally sliced by a protected attribute. See
+    apps/applications/override_tracking.py for exactly what counts as an
+    override and why this is a fairness signal in its own right, not just
+    an accuracy metric."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from apps.matching.views import _resolve_organization_id
+
+        org_id = _resolve_organization_id(request)
+        if not org_id:
+            return Response(
+                {"detail": "Could not determine an organization (pass job_id or organization_id)."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        attr = request.query_params.get("protected_attribute")
+        if attr and attr not in ALLOWED_ATTRIBUTES:
+            return Response(
+                {"detail": f"protected_attribute must be one of {ALLOWED_ATTRIBUTES}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from apps.applications.override_tracking import get_override_summary
+        return Response(get_override_summary(org_id, attr))
+
+
 class FairnessReportView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 

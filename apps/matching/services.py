@@ -7,6 +7,51 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+# How many real (non-synthetic) hire/reject-style decisions an organization
+# needs before its matching is described as more than provisional. There is
+# no per-org trained model behind this yet, these tiers exist so the UI can
+# honestly tell an org where they stand rather than implying every org's
+# matching is equally trustworthy from day one. See get_matching_confidence.
+CONFIDENCE_TIERS = [
+    (0, "no_data", "No real decisions yet. Matching is provisional, based on synthetic-trained defaults only."),
+    (1, "very_early", "A handful of real decisions logged. Far too few to mean anything yet, treat scores as provisional."),
+    (10, "early_signal", "Some real decisions logged. An early signal at best, not yet enough to trust matching for this organization specifically."),
+    (50, "building", "A meaningful number of real decisions logged. Confidence is building, but this has not been formally validated."),
+    (200, "calibrated", "A substantial number of real decisions logged for this organization. The clearest real signal this platform can offer without a dedicated per-org trained model."),
+]
+
+
+def get_matching_confidence(organization_id: int) -> dict:
+    """
+    Counts an organization's real (non-synthetic) hire/reject-style
+    decisions and returns which confidence tier that puts them in. This is
+    deliberately blunt (a count-based tier, not a trained model) because
+    there is currently no per-organization model that actually learns from
+    this data. It exists so the product can honestly answer "how much
+    should I trust this org's matching" instead of implying every
+    organization's matching is equally reliable regardless of how much real
+    decision data actually backs it.
+    """
+    from apps.applications.models import Application
+
+    real_decisions = Application.objects.filter(
+        job__organization_id=organization_id,
+        is_synthetic=False,
+        status__in={"shortlisted", "interview", "offer", "hired", "rejected"},
+    ).count()
+
+    tier, description = CONFIDENCE_TIERS[0][1], CONFIDENCE_TIERS[0][2]
+    for threshold, tier_key, tier_description in CONFIDENCE_TIERS:
+        if real_decisions >= threshold:
+            tier, description = tier_key, tier_description
+
+    return {
+        "organization_id": organization_id,
+        "real_decision_count": real_decisions,
+        "confidence_tier": tier,
+        "description": description,
+    }
+
 
 def _load_weights() -> dict:
     """
@@ -112,7 +157,7 @@ def _compute_overall(
             "required_skills": job_required,
             "preferred_skills": job_preferred,
             "min_experience_years": min_exp,
-            "required_education": "bachelor",
+            "required_education": job.required_education or "",
             "experience_level": job.experience_level or "mid",
             "work_model": job.work_model or "onsite",
         }
@@ -145,12 +190,14 @@ def match_candidate_to_job(candidate, job) -> dict:
     skill = compute_skill_overlap_score(candidate_skills, job_skills)
 
     # Experience
-    exp_required = None
     exp_req_field = job.skill_requirements.filter(is_required=True).values_list("min_years", flat=True).first()
+    exp_required = float(exp_req_field) if exp_req_field else None
     experience = compute_experience_score(candidate.years_of_experience, exp_required)
 
-    # Education
-    education = compute_education_score(candidate.highest_education, "bachelor")
+    # Education -- job.required_education falls back to "" (no stated
+    # requirement) rather than assuming every job needs a bachelor's degree;
+    # compute_education_score treats an unset requirement as automatically met.
+    education = compute_education_score(candidate.highest_education, getattr(job, "required_education", "") or "")
 
     # Use trained ML model if available, otherwise fall back to fixed weights
     overall = _compute_overall(semantic, skill, experience, education, candidate, job)
@@ -212,7 +259,7 @@ def run_batch_matching_for_job(job_id: int) -> int:
         candidate_skills = [s.skill_name for s in candidate.skills.all()]
         skill = compute_skill_overlap_score(candidate_skills, job_skills)
         experience = compute_experience_score(float(candidate.years_of_experience or 0), job_exp_required)
-        education = compute_education_score(candidate.highest_education or "", "bachelor")
+        education = compute_education_score(candidate.highest_education or "", job.required_education or "")
         overall = compute_hybrid_score(semantic, skill, experience, education)
 
         results.append(MatchResult(

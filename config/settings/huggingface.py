@@ -48,3 +48,9 @@ CACHES = {
 
 # Serve React SPA index.html from staticfiles
 TEMPLATES[0]["DIRS"] = [BASE_DIR / "staticfiles"]
+
+# Structured (JSON) logging for real deployments -- a log aggregator can
+# parse and alert on this, unlike the free-text "verbose" formatter used
+# for local development.
+LOGGING["formatters"]["json"] = {"()": "config.logging_formatters.JsonFormatter"}
+LOGGING["handlers"]["console"]["formatter"] = "json"
