@@ -168,16 +168,19 @@ export default function About() {
           </p>
           <ul className="space-y-4">
             <li className="text-gray-300 leading-relaxed">
-              <strong className="text-white">SBERT</strong>: I'm not claiming a number of my own here, and I want to be
-              specific about why. It's a pretrained model (all-MiniLM-L6-v2) with its own published, third-party benchmark
-              performance on semantic textual similarity, reported independently by the sentence-transformers project and
-              on the public MTEB leaderboard, not by me. That is the model's own reported number, measuring general
-              semantic similarity, not "predicting hiring success" specifically, and I'm citing it as exactly that: the
-              model's benchmark, on its own task, from its own publisher. I'm not presenting it as this platform's
-              accuracy, and you shouldn't take it as one either. If you want the current figure, the model's own page on
-              Hugging Face and the MTEB leaderboard are the source, not this paragraph, because a third party's published
-              number can change as they re-run evaluations and I'd rather point you to the live source than freeze a
-              number here that could go stale.
+              <strong className="text-white">SBERT</strong>: I am not claiming a number of my own here. This is a
+              pretrained model (all-MiniLM-L6-v2), and its accuracy has already been measured by the people who built
+              it, not by me. On the STS Benchmark, a standard test of how well a model judges two sentences as similar
+              in meaning, it is commonly reported to score in the mid-80s out of 100. On the broader MTEB benchmark, a
+              suite of 56 different language tasks, it averages in the mid-50s out of 100, which is expected since that
+              suite tests far more than just similarity matching. I want to be upfront that I saw slightly different
+              exact numbers depending on which evaluation writeup I checked (the mid-80s figure ranged from about 82 to
+              85 across sources), which is normal since benchmark scores can shift a little as evaluation code and
+              dataset versions get updated over time. Rather than freeze one exact decimal here that could go stale,
+              I'd point you to the model's own page on Hugging Face and the public MTEB leaderboard for the current
+              number. What matters most for this platform: that score measures general sentence similarity, not
+              hiring success, so it should be read as this model's reputation on its own task, never as this
+              platform's accuracy.
             </li>
             <li className="text-gray-300 leading-relaxed">
               <strong className="text-white">spaCy</strong>: this is the one piece I can actually measure honestly, and
