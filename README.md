@@ -10,57 +10,66 @@ pinned: false
 
 # Explainable AI Hiring Intelligence Platform
 
-**An Explainable and Fair NLP-Based Candidate–Job Matching Framework Using Django and Multi-Source Recruitment Data**
+**An Explainable and Fair NLP-Based Candidate to Job Matching Framework Using Django and Multi-Source Recruitment Data**
 
 > Made by [SKMMT](https://skmmt.rootexception.com/).
-> View [Demo](https://sheikhkmmtahmid-hiringai-platform.hf.space/)
+> View [Demo](https://sheikhkmmtahmid-hiringai-platform.hf.space/) · [About & data sources](https://sheikhkmmtahmid-hiringai-platform.hf.space/about) · [Governance](https://sheikhkmmtahmid-hiringai-platform.hf.space/governance)
 
 ---
 
 ## Overview
 
-The Explainable AI Hiring Intelligence Platform is a production-grade Django web application that acts as an AI-powered decision-support system for recruitment. It is not a traditional ATS or a keyword matcher — it is a full hiring intelligence platform that helps recruiters justify decisions, understand why candidates are selected or rejected, and detect bias in hiring pipelines.
+The Explainable AI Hiring Intelligence Platform is a production-grade Django + React application that acts as an AI-powered decision-support system for recruitment. It is not a traditional ATS or a keyword matcher; it is a full hiring intelligence platform that helps recruiters justify decisions, understand why candidates are selected or rejected, and audit hiring pipelines for bias.
 
-The system integrates live job APIs, synthetic recruitment data, semantic NLP matching via Sentence-BERT, explainable AI outputs via SHAP and LIME, and fairness analytics across protected demographic groups — all exposed through a clean REST API.
+The system runs semantic NLP matching via Sentence-BERT, explainable AI outputs via SHAP and LIME, and fairness analytics across protected demographic groups, all exposed through a multi-tenant REST API with its own billing layer. It runs against a mix of real recruitment data pulled from eight public datasets and synthetic data generated specifically to exercise the fairness-audit features under known, controlled bias scenarios. The two are never blended silently: every job and candidate record is tagged with where it came from, and the [About page](https://sheikhkmmtahmid-hiringai-platform.hf.space/about) documents exactly what was imported, from where, under what license, and what its limitations are.
 
 ---
 
 ## Key Features
 
-### Candidate–Job Matching
+### Candidate to Job Matching
 - Semantic matching using Sentence-BERT (SBERT) embeddings
-- Hybrid scoring: semantic similarity + skill overlap + experience match + education match
-- Batch matching across all candidates for a given job
-- Ranked shortlists with configurable top-N output
+- Hybrid scoring: semantic similarity, skill overlap, experience match, and education match, combined by a trained GradientBoostingClassifier (falls back to fixed, principled weights until an organization has enough real hiring decisions to learn from responsibly)
+- Batch matching across the full candidate pool for a given job, run async via Celery
+- Ranked shortlists with configurable top-N output, plus a matching confidence tier (no data, early signal, or calibrated) based on how many real decisions exist for that job
 
 ### Explainable AI
 - SHAP-based feature importance per match result
 - LIME-based local explanation as an alternative method
-- Human-readable summary: why a candidate matched, what skills are missing, what drove the score
+- Human-readable summary of why a candidate matched, what skills are missing, and what drove the score
 - All outputs stored and served via REST API
 
 ### Fairness Analytics
-- Disparate Impact Ratio (4/5 rule) per protected attribute
-- Demographic Parity Difference across subgroups
-- Supported attributes: gender, age range, ethnicity, disability status
-- Bias flag raised automatically when DI ratio falls below 0.8
+- Disparate Impact Ratio (4/5 rule) and Demographic Parity Difference per protected attribute (gender, age range, ethnicity, disability status)
+- Audits real recruiter decisions (shortlisted, interviewed, offered, hired, rejected) once they exist; falls back to a clearly labeled provisional estimate from the AI's own ranking when they don't, and never mixes the two silently
+- Recruiter override tracking: how often a real decision went against what the AI ranking would have suggested
+- Benchmark comparison against real 2018 EEOC EEO-1 national workforce data
+- A counterfactual name-bias probe that swaps first names across race and gender coded variants of the same resume, holding everything else fixed, to check whether the match score is sensitive to a name alone
 
-### Multi-Source Data Pipeline
-- Live job ingestion from Adzuna API (Jooble and The Muse ready)
-- Synthetic candidate and job generation (5000+ candidates, 1000+ jobs) using Faker
-- CV upload and async parsing (PDF, DOCX, TXT)
-- Skill ontology based on ESCO/O*NET patterns
+### Real-World and Synthetic Data Pipeline
+- Over 38,500 real job postings and 13,000 real candidate profiles imported from eight public datasets (see below), deduplicated by content hash both within and across sources
+- The one dataset with real hiring outcomes, a 2004 audit study on racial discrimination in callbacks, is imported with its actual 4,870 real application decisions and 392 real callbacks intact
+- Synthetic candidate and job generation using Faker, purpose-built to model protected attributes explicitly so the fairness features have something realistic to test against
+- CV upload and async parsing (PDF, DOCX, TXT) via the same spaCy-based extraction pipeline used for every imported real resume
+- Skill ontology synced from ESCO, with a moderation queue for skills proposed during CV parsing or job creation that don't already exist in the taxonomy
+
+### Multi-Tenancy & Billing
+- Each organization's candidates, jobs, applications, and fairness data are isolated from every other organization's
+- Platform staff accounts can see and manage across every organization; recruiter and analyst accounts are scoped to their own
+- Open-ended, pluggable billing: payment providers (Stripe, SSLCommerz) are rows in a database table seeded by a management command, not a hardcoded enum, so adding a new payment rail for a new country doesn't require a rewrite of the billing flow
+- Manual payment proof review path for providers that aren't fully automated, with an admin review queue
 
 ### Recruiter Workflow
-- Full application pipeline: Applied → Screening → Shortlisted → Interview → Offer → Hired/Rejected
+- Full application pipeline: Applied, Screening, Shortlisted, Interview, Offer, Hired or Rejected
 - Recruiter notes and interview scheduling per application
+- Lightweight task management for recruiter to-dos tied to a job or candidate
 - Pipeline snapshot analytics per job
 
 ### Global Support
-- No UK-only assumptions — supports any country, city, region
-- Remote / hybrid / on-site work model tracking
+- No country-specific assumptions; supports any country, city, or region
+- Remote, hybrid, or on-site work model tracking
 - Multi-currency salary fields
-- Diverse synthetic data across 18+ global regions
+- Real data spans dozens of countries; synthetic data is generated across 18+ global regions
 
 ---
 
@@ -69,15 +78,18 @@ The system integrates live job APIs, synthetic recruitment data, semantic NLP ma
 | Layer | Technology |
 |---|---|
 | Backend Framework | Django 4.2 + Django REST Framework |
-| Authentication | JWT via djangorestframework-simplejwt |
-| Database | PostgreSQL 15 |
+| Frontend | React 18 + Vite |
+| Authentication | JWT via djangorestframework-simplejwt, with server-side token blacklisting on logout |
+| Database | TiDB Cloud (MySQL-compatible, serverless) via PyMySQL |
 | Cache / Message Broker | Redis 7 |
 | Async Task Queue | Celery 5 + Celery Beat |
 | NLP Embeddings | Sentence-BERT (all-MiniLM-L6-v2) |
 | NLP Parsing | spaCy (en_core_web_sm) |
+| Match Scoring | GradientBoostingClassifier (scikit-learn) over 4 hand-engineered features |
 | Explainability | SHAP + LIME |
 | Synthetic Data | Faker |
-| Containerisation | Docker + Docker Compose |
+| Billing | Stripe + SSLCommerz, pluggable provider model |
+| Containerisation | Docker (single-image build serving API and built React frontend) |
 | Python Version | 3.11 |
 
 ---
@@ -91,40 +103,57 @@ Explainable AI Hiring Intelligence Platform/
 │   ├── settings/
 │   │   ├── base.py                 # Shared settings
 │   │   ├── development.py          # Dev overrides
-│   │   └── production.py           # Production overrides (S3, Sentry, HTTPS)
+│   │   └── huggingface.py          # Container deployment settings (JSON logging, static file serving)
 │   ├── urls.py                     # Root URL configuration
+│   ├── health.py                   # /healthz/ liveness check (DB + cache)
+│   ├── logging_formatters.py       # Structured JSON log formatter for deployed environments
 │   ├── celery.py                   # Celery application
 │   ├── wsgi.py
 │   └── asgi.py
 │
-├── apps/                           # Django applications (12 modules)
-│   ├── accounts/                   # Custom user model, JWT auth, roles
+├── apps/                           # Django applications (15 feature modules)
+│   ├── accounts/                   # Custom user model, JWT auth, roles, org membership
+│   ├── organizations/              # Multi-tenancy: the Organization model and boundary
 │   ├── candidates/                 # Candidate profiles, CVs, skills, experience, embeddings
 │   ├── jobs/                       # Job posts, skill requirements, embeddings
-│   ├── applications/               # Application pipeline, notes, interview slots
+│   ├── applications/               # Application pipeline, notes, interview slots, override tracking
 │   ├── parsing/                    # CV text extraction and async parse jobs
-│   ├── matching/                   # SBERT + hybrid scoring, batch matching
+│   ├── matching/                   # SBERT + hybrid scoring, batch matching, confidence tiers
 │   ├── explainability/             # SHAP/LIME explanation reports
-│   ├── fairness/                   # Bias detection, subgroup metrics
-│   ├── ingestion/                  # External API ingestion (Adzuna, Jooble)
+│   ├── fairness/                   # Bias detection, subgroup metrics, EEOC benchmark, override summary
+│   ├── ingestion/                  # Real dataset importers (8 sources) plus live job API ingestion
 │   ├── synthetic_data/             # Faker-based data generators and tasks
-│   ├── taxonomy/                   # Skill ontology, job role templates
-│   └── analytics/                  # Platform summary, pipeline snapshots
+│   ├── taxonomy/                   # ESCO-synced skill ontology and moderation queue
+│   ├── analytics/                  # Platform summary, pipeline snapshots
+│   ├── billing/                    # Plans, subscriptions, pluggable payment providers
+│   ├── tasks/                      # Lightweight recruiter task management
+│   └── common/                     # Shared pagination, lorem-style text helpers
 │
-├── ml/                             # Machine learning layer
+├── ml/                              # Machine learning layer
 │   ├── embeddings/
-│   │   └── encoder.py              # Thread-safe lazy-loaded SBERT singleton
+│   │   └── encoder.py               # Thread-safe lazy-loaded SBERT singleton
 │   ├── matching/
-│   │   └── scorer.py               # 7-feature vector builder
+│   │   ├── scorer.py                # 4-feature vector builder
+│   │   └── trainer.py               # GradientBoostingClassifier training on real decisions
 │   ├── explainability/
-│   │   ├── shap_explainer.py       # SHAP feature importance
-│   │   └── lime_explainer.py       # LIME local explanations
+│   │   ├── shap_explainer.py        # SHAP feature importance
+│   │   └── lime_explainer.py        # LIME local explanations
 │   └── fairness/
-│       └── metrics.py              # DI ratio, demographic parity, equal opportunity
+│       ├── metrics.py               # DI ratio, demographic parity, equal opportunity
+│       ├── eeoc_benchmarks.py       # Real EEOC 2018 EEO-1 national workforce comparison
+│       └── name_bias_probe.py       # Counterfactual name-swap sensitivity test
 │
-├── templates/                      # Django HTML templates
+├── frontend/                        # React 18 + Vite single-page app
+│   └── src/
+│       ├── pages/                   # Route-level views, including the public About and Governance pages
+│       ├── api/                     # Axios client and one module per backend resource
+│       └── components/
+│
+├── templates/                      # Django HTML templates (serves the built React index.html)
 ├── static/                         # Static CSS/JS assets
 ├── media/                          # User-uploaded files (CVs, etc.)
+├── docs/                           # Monitoring/alerting notes, payment go-live checklist
+├── scripts/                        # Load testing and one-off operational scripts
 │
 ├── requirements/
 │   ├── base.txt                    # Core dependencies
@@ -134,29 +163,33 @@ Explainable AI Hiring Intelligence Platform/
 ├── .venv/                          # Python virtual environment (local)
 ├── .env                            # Local environment variables (not committed)
 ├── .env.example                    # Template for environment variables
-├── Dockerfile                      # Production Docker image
-├── docker-compose.yml              # Full local stack (DB + Redis + Web + Celery)
+├── Dockerfile                      # Single-image build: React build + Django, served by Gunicorn
+├── start.sh                        # Container entrypoint: migrate, collectstatic, Celery + Gunicorn
 ├── manage.py                       # Django management entry point
 ├── pyproject.toml                  # Black, isort, ruff, pytest configuration
 └── README.md
 ```
 
+Two of the entries under `apps/` don't show up in that feature list on purpose. `celery_beat_migrations` and `token_blacklist_migrations` are migration-only packages for `django-celery-beat` and `simplejwt`'s token blacklist app. TiDB rejects some of the ALTER TABLE patterns their upstream migrations generate, so those migrations are faked and replaced with TiDB-compatible SQL via a management command instead.
+
 ---
 
 ## API Endpoints
 
-All endpoints are prefixed with `/api/v1/`.
+All endpoints are prefixed with `/api/v1/`. `GET /healthz/` (unprefixed) is a liveness check for deployment monitoring.
 
 | Endpoint | Description |
 |---|---|
 | `POST /auth/register/` | Register a new user |
 | `POST /auth/login/` | Login and receive JWT tokens |
 | `POST /auth/token/refresh/` | Refresh access token |
+| `POST /auth/logout/` | Blacklist the refresh token server-side |
 | `GET/PUT /auth/me/` | View and update own profile |
+| `GET /organizations/me/` | View own organization |
 | `GET/POST /candidates/` | List candidates or create a profile |
 | `POST /candidates/{id}/upload_cv/` | Upload a CV (triggers async parsing) |
 | `GET /parsing/status/{cv_id}/` | Check CV parse job status |
-| `GET/POST /jobs/` | List jobs or create a job post |
+| `GET/POST /jobs/` | List jobs or create a job post (supports search, source/status filters, pagination) |
 | `GET /jobs/active/` | List all active job posts |
 | `GET/POST /applications/` | List or create applications |
 | `PATCH /applications/{id}/update_status/` | Move application through pipeline |
@@ -164,39 +197,48 @@ All endpoints are prefixed with `/api/v1/`.
 | `POST /matching/trigger/{job_id}/` | Trigger batch matching for a job (async) |
 | `GET /matching/results/?job={id}` | Get match results for a job |
 | `GET /matching/top-candidates/{job_id}/` | Get top-N ranked candidates |
+| `GET /matching/confidence/?job_id={id}` | Matching confidence tier for a job |
 | `GET/POST /explainability/{match_result_id}/` | Get or generate explanation |
 | `GET/POST /fairness/{job_id}/` | Get or compute fairness report |
+| `GET /fairness/overrides/?job_id={id}` | Recruiter override rate vs AI ranking |
 | `POST /ingestion/trigger/` | Trigger live job ingestion from an API |
 | `GET /ingestion/runs/` | View ingestion run history |
 | `POST /synthetic/generate/` | Generate synthetic candidates or jobs |
 | `GET /synthetic/runs/` | View synthetic generation history |
-| `GET /taxonomy/skills/` | Browse skill ontology |
+| `GET /taxonomy/skills/` | Browse or search the skill ontology |
 | `GET /analytics/summary/` | Platform-wide statistics |
 | `GET /analytics/pipeline/{job_id}/` | Pipeline funnel for a specific job |
+| `GET /billing/plans/`, `GET /billing/providers/` | Available plans and payment providers |
+| `GET/POST /billing/subscription/`, `/billing/subscribe/` | View or change an organization's subscription |
+| `GET/POST /tasks/` | Recruiter task management |
 
 ---
 
-## User Roles
+## User Roles & Multi-Tenancy
 
 | Role | Access |
 |---|---|
-| `admin` | Full platform access |
-| `recruiter` | All candidates, jobs, applications, matching, fairness |
-| `analyst` | Read-only access to matching, fairness, analytics |
+| `admin` (platform staff) | Full access across every organization |
+| `recruiter` | All candidates, jobs, applications, matching, fairness, billing, scoped to their own organization |
+| `analyst` | Read-only access to matching, fairness, analytics, scoped to their own organization |
 | `candidate` | Own profile and own applications only |
+
+Every recruiter and analyst account belongs to exactly one `Organization`. Candidates, jobs, applications, match results, and fairness reports are all scoped to that boundary, so one organization never sees another's data. The public job board (`GET /jobs/`, `/jobs/active/`) is the one deliberate exception: active job postings from every organization are visible to anyone, the same as any real job board.
 
 ---
 
 ## Matching Score Breakdown
 
-Each candidate–job match produces five component scores combined into one overall score:
+Each candidate to job match produces four component scores combined into one overall score by the trained GradientBoostingClassifier:
 
-| Component | Weight | Description |
+| Component | Default Weight | Description |
 |---|---|---|
 | Semantic similarity | 50% | Cosine similarity between SBERT embeddings of candidate profile and job description |
 | Skill overlap | 30% | Ratio of required job skills present in candidate's skill set |
-| Experience match | 15% | Candidate years of experience vs. job requirement |
-| Education match | 5% | Ordinal comparison of education levels |
+| Experience match | 15% | Candidate years of experience vs. the job's actual stated requirement |
+| Education match | 5% | Ordinal comparison against the job's actual stated education requirement, not an assumed default |
+
+These are the fixed weights the platform falls back to until an organization has enough real hiring decisions logged to train the classifier on its own outcomes responsibly. Once it does, `ml/matching/trainer.py` retrains against that organization's real `hired`/`rejected` labels instead.
 
 ---
 
@@ -230,60 +272,119 @@ Each candidate–job match produces five component scores combined into one over
 ```json
 {
   "protected_attribute": "gender",
+  "basis": "real_decisions",
   "disparate_impact_ratio": 0.76,
-  "selection_rate_overall": 0.42,
-  "bias_flag": true,
+  "demographic_parity_difference": 0.11,
+  "bias_detected": true,
   "subgroups": {
-    "male":   { "total": 210, "shortlisted": 102, "selection_rate": 0.486 },
-    "female": { "total": 198, "shortlisted":  74, "selection_rate": 0.374 },
-    "non_binary": { "total": 42, "shortlisted": 16, "selection_rate": 0.381 }
+    "male":   { "total": 210, "selected": 102, "selection_rate": 0.486 },
+    "female": { "total": 198, "selected":  74, "selection_rate": 0.374 },
+    "non_binary": { "total": 42, "selected": 16, "selection_rate": 0.381 }
+  },
+  "eeoc_benchmark": {
+    "supported": true,
+    "source_year": 2018,
+    "note": "Compared against real EEOC EEO-1 national workforce data"
   }
 }
 ```
 
-A `bias_flag: true` means the Disparate Impact Ratio is below 0.8 (the 4/5 rule), indicating potential systemic bias.
+`"basis": "real_decisions"` means this report audits actual recruiter decisions. If a job has no shortlisted, interviewed, hired, or rejected decisions yet, `basis` is `"ai_rank_provisional"` instead, and the report is computed from the AI's ranking alone until real decisions exist. A `bias_detected: true` flag means the Disparate Impact Ratio fell below 0.8 (the 4/5 rule).
+
+---
+
+## Model Reliability
+
+Not every model in this stack can honestly claim the same kind of reliability number, and this section says exactly which is which rather than implying they're all equally validated.
+
+**SBERT** does not have an accuracy number computed on this platform's data, and none is claimed here. It is a pretrained model (`all-MiniLM-L6-v2`) with its own published, third-party benchmark performance on semantic textual similarity, reported independently by the sentence-transformers project and on the public MTEB leaderboard. That is the model's own reported benchmark on its own general task, not a measurement of this platform or of hiring outcomes. Treat the model's own Hugging Face card and the MTEB leaderboard as the source of truth, since a third party's published number can be updated as they re-run evaluations, and citing it here as a fixed figure would risk it going stale.
+
+**spaCy skill extraction** was evaluated directly, since this is the one component that can be checked honestly without any hiring-outcome ground truth. 16 real candidates were sampled at random from the imported datasets (the OpenIntro audit study was excluded, since its "resumes" are short fabricated bio stubs by design, not full free-text CVs). Each was read in full and manually annotated with the skills a recruiter would reasonably tag, then compared against what the extraction pipeline actually produced:
+
+```
+n candidates: 16 | true positives: 59 | false positives: 4 | false negatives: 8
+precision: 0.9365 | recall: 0.8806 | F1: 0.9077
+```
+
+Two of the four false positives are worth naming directly rather than hiding in a summary statistic: the extractor tagged "typescript" on an Oracle/SQL database administrator's resume that never mentions JavaScript or TypeScript, and "statistics" on a SQL Server administrator's resume that never uses that word either. This is a small, fixed, honestly-scoped sample, not a claim about extraction accuracy across the full real candidate pool, and it is reproducible: `python manage.py shell -c "from ml.nlp.skill_extraction_eval import run; run()"` (annotations live in `ml/nlp/skill_extraction_eval.py`).
+
+**GradientBoostingClassifier** cannot honestly be given a general accuracy number today, and this was checked precisely rather than assumed. Pulling the actual training data behind the currently saved model:
+
+```
+251 labeled MatchResult rows: 26 hired=True, 225 hired=False
+Of those 251, 0 come from a real candidate and real job pair. All 251 are synthetic.
+```
+
+Any accuracy or ROC-AUC figure this model reports right now would measure agreement with this platform's own synthetic hiring simulator, not real hiring behavior, so it is not presented as "model accuracy" anywhere in this project. The gap has a precise, known cause: `apps/applications/signals.py` syncs `MatchResult.hired` from `Application.status` only at the moment an `Application` row is saved, and only updates a `MatchResult` that already exists at that exact instant. Most of the OpenIntro audit study's 4,870 real application outcomes were imported before batch matching had ever run for their jobs, so that sync fired once, updated nothing, and never re-fired later once a `MatchResult` existed. The real outcome data is sitting in the database; it simply never reached this model's training set. That is fixable narrowly: a direct, on-demand comparison of those 4,870 real outcomes against match scores (rather than relying on the one-shot signal) would produce one legitimate, narrow, real accuracy number, honestly scoped to a 2001 to 2002 study of entry-level clerical and sales roles in two U.S. cities. That comparison has not been built yet.
+
+**The counterfactual name-bias probe**, unlike the classifier above, has a real, already-run result. Across 300 real candidate and job pairs and 24 real name variants per resume (drawn from the audit study's own most common White-female, White-male, Black-female, and Black-male coded names), average score movement between White-coded and Black-coded names was 0.0019, statistically indistinguishable from zero. There was some sensitivity to a name being present at all (about 0.056 on average across variants), but it did not consistently favor either group. Reproducible from `ml/fairness/name_bias_probe.py`.
+
+**Fairness math** (Disparate Impact Ratio, Demographic Parity Difference) is not a predictive model and doesn't need a reliability claim in the same sense; it is arithmetic over whatever real decisions an organization has actually logged, and is exactly as reliable as that data entry.
+
+---
+
+## Real-World Data
+
+Real job postings and candidate profiles come from eight public datasets, deduplicated by content hash both within and across sources so the same posting or resume is never counted twice, even when two datasets happen to scrape the same original source.
+
+| Source | What it provides | Imported |
+|---|---|---|
+| [EMSCAD](https://www.kaggle.com/datasets/shivamb/real-or-fake-fake-jobposting-prediction) | Real job postings | 15,546 |
+| [jobs.am](https://www.kaggle.com/datasets/madhab/jobposts) (Armenian CareerCenter, 2004 to 2015) | Real job postings | 17,718 |
+| [LinkedIn Job Postings](https://www.kaggle.com/datasets/arshkon/linkedin-job-postings) (2023 to 2024) | Real job postings | 1,949 |
+| [Djinni Recruitment Dataset](https://huggingface.co/collections/lang-uk/djinni-recruitment-dataset) | Real job postings and anonymized real candidate CVs | 2,000 + 2,000 |
+| [Resume Dataset](https://www.kaggle.com/datasets/snehaanbhawal/resume-dataset) (livecareer.com samples) | Real template resumes | 2,481 |
+| [resume_corpus](https://github.com/florex/resume_corpus) | Real resumes | 2,000 |
+| [Resume-Classification-Dataset](https://github.com/noran-mohamed/Resume-Classification-Dataset) | Real resumes | 1,821 |
+| [Resume-Callback Audit Study](https://www.openintro.org/data/index.php?data=resume) (Bertrand & Mullainathan, 2004) | Real job postings, audit-study resumes, and real employer callback decisions | 1,323 jobs, 4,870 applications, 392 real callbacks |
+
+For every real candidate, protected attributes (gender, ethnicity, age range, disability status) are left blank; they're never fabricated for a real person. The one exception is the audit study above, where race and gender coded names were the actual controlled variable in the original research, so those records carry that name-coded label explicitly rather than presenting it as self-reported data. Only the fully synthetic dataset, generated rather than based on any real person, models protected attributes directly, specifically so the fairness audit has a realistic scenario to test itself against.
+
+Full sourcing detail, license citations, what was deliberately excluded and why, and a notice-and-takedown contact are on the in-app [About page](https://sheikhkmmtahmid-hiringai-platform.hf.space/about) rather than duplicated here, since that page is generated from the same dataset metadata the importers use and won't drift out of sync with what's actually loaded.
+
+> LinkedIn and Indeed are never scraped directly by this platform. The LinkedIn dataset above is a third-party Kaggle republish, used with the sourcing caveats documented on the About page.
 
 ---
 
 ## Running the Platform (Quick Start)
 
-Once everything is installed, you need **4 terminals open simultaneously** every time you run the platform.
+The platform needs a MySQL-compatible database (TiDB Cloud's free serverless tier is what this project actually runs against; a local MySQL 8+ works too for development) and Redis. Once those are reachable, you need **4 terminals open simultaneously**.
 
-### Terminal 1 — Redis (run once; skip if already running)
+### Terminal 1: Redis (run once; skip if already running)
 ```powershell
 docker run -d -p 6379:6379 --name redis redis:7-alpine
 ```
-> If it says "name already in use", Redis is already running — skip this step.
+> If it says "name already in use", Redis is already running, so skip this step.
 
-### Terminal 2 — Celery Worker (keep open)
+### Terminal 2: Celery Worker (keep open)
 ```powershell
 cd "d:\Explainable AI Hiring Intelligence Platform"
 .venv\Scripts\Activate.ps1
 celery -A config worker --loglevel=info --pool=solo
 ```
 
-### Terminal 3 — Django Backend (keep open)
+### Terminal 3: Django Backend (keep open)
 ```powershell
 cd "d:\Explainable AI Hiring Intelligence Platform"
 .venv\Scripts\Activate.ps1
-python manage.py runserver
+python manage.py runserver 8001
 ```
 
-### Terminal 4 — React Frontend (keep open)
+### Terminal 4: React Frontend (keep open)
 ```powershell
 cd "d:\Explainable AI Hiring Intelligence Platform\frontend"
 npm install
 npm run dev
 ```
-> `npm install` only needed the first time.
+> `npm install` is only needed the first time.
 
 Once all 4 are running:
 
 | Interface | URL |
 |---|---|
 | **HR Frontend (React)** | `http://localhost:3000` |
-| **Backend API** | `http://127.0.0.1:8000/api/v1/` |
-| **Django Admin** | `http://127.0.0.1:8000/admin/` |
+| **Backend API** | `http://127.0.0.1:8001/api/v1/` |
+| **Django Admin** | `http://127.0.0.1:8001/admin/` |
 
 Login with the superuser account you created during setup.
 
@@ -291,16 +392,16 @@ Login with the superuser account you created during setup.
 
 ## How to Run
 
-### Option 1 — Local Development (Recommended for development)
+### Local Development
 
-**Prerequisites:** Python 3.11, PostgreSQL 15, Redis 7
+**Prerequisites:** Python 3.11, Node 20, a MySQL 8+ or TiDB-compatible database, Redis 7
 
-**Step 1 — Clone and enter the project**
+**Step 1: Clone and enter the project**
 ```bash
 cd "Explainable AI Hiring Intelligence Platform"
 ```
 
-**Step 2 — Activate the virtual environment**
+**Step 2: Activate the virtual environment**
 ```bash
 # Windows
 .venv\Scripts\activate
@@ -309,109 +410,101 @@ cd "Explainable AI Hiring Intelligence Platform"
 source .venv/bin/activate
 ```
 
-**Step 3 — Copy environment variables**
+**Step 3: Copy environment variables**
 ```bash
 cp .env.example .env
-# Edit .env and fill in DB credentials and any API keys you have
+# Edit .env: set DB_HOST, DB_NAME, DB_USER, DB_PASSWORD, and DB_PORT for your TiDB
+# or MySQL instance, plus REDIS_URL and any API keys you have
 ```
 
-**Step 4 — Create the database**
+**Step 4: Install Python dependencies**
 ```bash
-# In psql or pgAdmin:
-CREATE USER hiringai WITH PASSWORD 'hiringai_pass';
-CREATE DATABASE hiringai_db OWNER hiringai;
+pip install -r requirements/development.txt
 ```
 
-**Step 5 — Run migrations**
+**Step 5: Run migrations**
 ```bash
 python manage.py migrate
 ```
 
-**Step 6 — Create a superuser**
+**Step 6: Create a superuser**
 ```bash
 python manage.py createsuperuser
 ```
 
-**Step 7 — Download the spaCy model**
+**Step 7: Download the spaCy model**
 ```bash
 python -m spacy download en_core_web_sm
 ```
 
-**Step 8 — Start the development server**
+**Step 8: Start the development server**
 ```bash
-python manage.py runserver
+python manage.py runserver 8001
 ```
 
-**Step 9 — Start Celery worker (in a separate terminal)**
+**Step 9: Start Celery worker (in a separate terminal)**
 ```bash
-celery -A config.celery worker --loglevel=info
+celery -A config worker --loglevel=info --pool=solo
 ```
 
-**Step 10 — Start Celery Beat scheduler (in a separate terminal)**
+**Step 10: Start the React frontend (in a separate terminal)**
 ```bash
-celery -A config.celery beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+cd frontend
+npm install
+npm run dev
 ```
 
-The API will be available at `http://localhost:8000/api/v1/`
-The admin panel will be available at `http://localhost:8000/admin/`
+The API is available at `http://localhost:8001/api/v1/`, the admin panel at `http://localhost:8001/admin/`, and the frontend dev server proxies `/api` to it automatically.
 
 ---
 
-### Option 2 — Docker Compose (Full stack in one command)
+### Container Deployment
 
-**Prerequisites:** Docker Desktop
+The `Dockerfile` builds a single image containing both the Django backend and the compiled React frontend, served by Gunicorn. This is exactly what runs on the live Hugging Face Space.
 
 ```bash
-# Copy environment file
-cp .env.example .env
-
-# Build and start all services
-docker-compose up --build
-
-# In a separate terminal, run migrations
-docker-compose exec web python manage.py migrate
-docker-compose exec web python manage.py createsuperuser
-docker-compose exec web python manage.py loaddata initial_taxonomy  # optional
+docker build -t hiringai-platform .
+docker run -p 7860:7860 --env-file .env hiringai-platform
 ```
 
-This starts:
-- `db` — PostgreSQL 15
-- `redis` — Redis 7
-- `web` — Django development server on port 8000
-- `celery_worker` — Celery worker (4 concurrent processes)
-- `celery_beat` — Celery Beat periodic task scheduler
+`start.sh` runs migrations, collects static files, starts a Celery worker in the background, and then starts Gunicorn on port 7860. Point `DB_*` and `REDIS_URL` in `.env` at reachable services before running it. There's no bundled database or Redis container in this image, since the deployed Space connects out to TiDB Cloud and a managed Redis instance rather than running them alongside it.
+
+---
+
+### Importing Real Datasets
+
+Each real dataset has its own management command under `apps/ingestion/management/commands/`, for example:
+
+```bash
+python manage.py import_emscad
+python manage.py import_jobsam
+python manage.py import_linkedin_jobs --limit 2000
+python manage.py import_djinni_jobs --limit 2000
+python manage.py import_djinni_candidates --limit 2000
+python manage.py import_resume_cc0
+python manage.py import_resume_florex --limit 2000
+python manage.py import_resume_noranmohamed --limit 2000
+python manage.py import_openintro_audit_study
+```
+
+Every command accepts `--limit N` (`0` for unlimited) and is safe to re-run: already-imported rows are skipped by source and content hash, not re-inserted.
 
 ---
 
 ### Generating Synthetic Data
 
-Once the server is running, seed the platform with synthetic data via the API:
-
 ```bash
 # Generate 500 synthetic candidates
-curl -X POST http://localhost:8000/api/v1/synthetic/generate/ \
+curl -X POST http://localhost:8001/api/v1/synthetic/generate/ \
   -H "Authorization: Bearer <your_token>" \
   -H "Content-Type: application/json" \
   -d '{"kind": "candidates", "count": 500}'
 
 # Generate 200 synthetic jobs
-curl -X POST http://localhost:8000/api/v1/synthetic/generate/ \
+curl -X POST http://localhost:8001/api/v1/synthetic/generate/ \
   -H "Authorization: Bearer <your_token>" \
   -H "Content-Type: application/json" \
   -d '{"kind": "jobs", "count": 200}'
-```
-
----
-
-### Ingesting Live Jobs from Adzuna
-
-Add your Adzuna credentials to `.env`, then:
-
-```bash
-curl -X POST http://localhost:8000/api/v1/ingestion/trigger/ \
-  -H "Authorization: Bearer <your_token>" \
-  -H "Content-Type: application/json" \
-  -d '{"source": "adzuna", "query": "data scientist", "country": "us", "location": "New York"}'
 ```
 
 ---
@@ -429,47 +522,38 @@ pytest --cov=apps --cov-report=html   # with coverage report
 
 | Variable | Description | Default |
 |---|---|---|
-| `DJANGO_SECRET_KEY` | Django secret key | — (required) |
-| `DJANGO_DEBUG` | Enable debug mode | `True` |
+| `DJANGO_SECRET_KEY` | Django secret key | required, no default |
+| `DJANGO_DEBUG` | Enable debug mode | `False` |
 | `DJANGO_SETTINGS_MODULE` | Settings module path | `config.settings.development` |
-| `DB_NAME` | PostgreSQL database name | `hiringai_db` |
-| `DB_USER` | PostgreSQL username | `hiringai` |
-| `DB_PASSWORD` | PostgreSQL password | `hiringai_pass` |
-| `DB_HOST` | PostgreSQL host | `localhost` |
-| `DB_PORT` | PostgreSQL port | `5432` |
+| `DB_NAME` | Database name | `hiringai` |
+| `DB_USER` | Database username | `root` |
+| `DB_PASSWORD` | Database password | empty |
+| `DB_HOST` | Database host | `localhost` |
+| `DB_PORT` | Database port | `4000` (TiDB default) |
 | `REDIS_URL` | Redis cache URL | `redis://localhost:6379/0` |
 | `CELERY_BROKER_URL` | Celery broker URL | `redis://localhost:6379/1` |
 | `CELERY_RESULT_BACKEND` | Celery result backend | `redis://localhost:6379/2` |
-| `ADZUNA_APP_ID` | Adzuna API app ID | — |
-| `ADZUNA_API_KEY` | Adzuna API key | — |
+| `BACKEND_BASE_URL` | Where the backend itself is reachable (for payment provider callbacks) | `http://localhost:8001` |
+| `ADZUNA_APP_ID` / `ADZUNA_API_KEY` | Adzuna live job ingestion API | empty |
+| `JOOBLE_API_KEY` / `THE_MUSE_API_KEY` | Additional live job ingestion APIs | empty |
 | `SBERT_MODEL_NAME` | Sentence-BERT model | `all-MiniLM-L6-v2` |
 | `SPACY_MODEL_NAME` | spaCy model | `en_core_web_sm` |
-
----
-
-## Data Sources
-
-| Source | Type | Usage |
-|---|---|---|
-| Adzuna API | Live | Real job listings (global) |
-| Jooble API | Live | Additional job listings (ready to integrate) |
-| The Muse API | Live | Additional job listings (ready to integrate) |
-| Faker (synthetic) | Generated | Diverse candidates and jobs for simulation |
-| Kaggle datasets | Offline | Resume and job datasets for training/evaluation |
-| ESCO / O\*NET | Reference | Skill ontology and taxonomy |
-
-> LinkedIn and Indeed are intentionally excluded — scraping these platforms violates their terms of service.
+| `STRIPE_SECRET_KEY` / `STRIPE_PUBLISHABLE_KEY` / `STRIPE_WEBHOOK_SECRET` | Stripe billing | empty, provider shows as not configured if blank |
+| `SSLCOMMERZ_STORE_ID` / `SSLCOMMERZ_STORE_PASSWORD` / `SSLCOMMERZ_SANDBOX` | SSLCommerz billing | empty |
+| `SENTRY_DSN` | Error tracking (production) | empty |
 
 ---
 
 ## Design Principles
 
 - **Explainability first:** Every match score has a human-readable explanation. No black-box outputs.
-- **Fairness by design:** Protected attributes are stored separately from matching logic, analysed post-hoc to detect systemic bias.
+- **Fairness by design, audited against reality:** Fairness reports run against real recruiter decisions once they exist, and say so plainly when they can't yet.
+- **Honest about real vs. synthetic:** Every job and candidate record is tagged with its source; protected attributes are never fabricated for a real person.
 - **Global applicability:** No hard-coded country or region assumptions. All location fields are free-form strings.
 - **Service layer architecture:** Business logic lives in `services.py` files, not in views or models.
 - **Async ML tasks:** All embedding generation and batch matching runs as Celery tasks, keeping the API non-blocking.
-- **Modular apps:** Each of the 12 apps has a single responsibility and can be extended independently.
+- **Multi-tenant by default:** Every model that holds an organization's data is scoped to that organization, not bolted on after the fact.
+- **Modular apps:** Each Django app has a single responsibility and can be extended independently.
 
 ---
 
@@ -479,13 +563,13 @@ This project demonstrates:
 
 - NLP-based semantic matching using transformer embeddings (SBERT)
 - Explainable AI using SHAP and LIME for hiring decision transparency
-- Algorithmic fairness analysis with Disparate Impact and Demographic Parity metrics
-- Multi-source data integration (APIs + synthetic + ontology)
-- Production-ready Django architecture with async processing
+- Algorithmic fairness analysis with Disparate Impact, Demographic Parity, and real external benchmark (EEOC) comparison
+- Integration and honest disclosure of real-world, licensed public datasets alongside a purpose-built synthetic data generator
+- Multi-tenant, production-shaped Django architecture with async processing and pluggable billing
 
 It serves as both a portfolio project and a research prototype for the academic paper:
 
-> *"An Explainable and Fair NLP-Based Candidate–Job Matching Framework Using Django and Multi-Source Recruitment Data"*
+> *"An Explainable and Fair NLP-Based Candidate to Job Matching Framework Using Django and Multi-Source Recruitment Data"*
 
 ---
 

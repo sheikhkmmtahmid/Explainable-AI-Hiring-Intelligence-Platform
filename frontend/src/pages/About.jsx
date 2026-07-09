@@ -168,28 +168,65 @@ export default function About() {
           </p>
           <ul className="space-y-4">
             <li className="text-gray-300 leading-relaxed">
-              <strong className="text-white">SBERT</strong>: I'm not claiming a number of my own here. It's a pretrained
-              model with its own published, independently verified benchmarks from the research that created it. Those
-              benchmarks measure general semantic similarity, not specifically "predicting hiring success," so I'm citing
-              its reputation, not inventing an accuracy figure.
+              <strong className="text-white">SBERT</strong>: I'm not claiming a number of my own here, and I want to be
+              specific about why. It's a pretrained model (all-MiniLM-L6-v2) with its own published, third-party benchmark
+              performance on semantic textual similarity, reported independently by the sentence-transformers project and
+              on the public MTEB leaderboard, not by me. That is the model's own reported number, measuring general
+              semantic similarity, not "predicting hiring success" specifically, and I'm citing it as exactly that: the
+              model's benchmark, on its own task, from its own publisher. I'm not presenting it as this platform's
+              accuracy, and you shouldn't take it as one either. If you want the current figure, the model's own page on
+              Hugging Face and the MTEB leaderboard are the source, not this paragraph, because a third party's published
+              number can change as they re-run evaluations and I'd rather point you to the live source than freeze a
+              number here that could go stale.
             </li>
             <li className="text-gray-300 leading-relaxed">
-              <strong className="text-white">spaCy</strong>: this is the one piece I can actually measure honestly. Does
-              it correctly pull the right skills and job titles out of a real resume? That's a real precision and recall
-              question I can check by hand against real text, independent of whether I have hiring outcome data at all.
+              <strong className="text-white">spaCy</strong>: this is the one piece I can actually measure honestly, and
+              unlike the other two, I actually did. Does it correctly pull the right skills out of a real resume? That's
+              a real precision and recall question I can check by hand against real text, independent of whether I have
+              hiring outcome data at all. So I did it: I sampled 16 real candidates at random from the imported datasets
+              (excluding the audit study below, whose "resumes" are short fabricated bio stubs by design, not full
+              resumes), read each one myself, and wrote down the skills a recruiter would reasonably tag before looking
+              at what the extractor produced. Across those 16 people (59 true positives, 4 false positives, 8 false
+              negatives), extraction came out to <strong className="text-white">93.7% precision and 88.1% recall</strong> (F1
+              90.8%). It also caught two real mistakes worth naming instead of hiding: it tagged "typescript" on a
+              resume that never mentions JavaScript or TypeScript once (it's an Oracle/SQL database administrator's CV),
+              and "statistics" on a SQL Server admin's resume that never uses that word either. Both are named,
+              reproducible false positives, not swept under the rug. This is a small, honest sample, not a claim about
+              accuracy across all 13,000+ real candidates, and it's a fixed, re-runnable check
+              (<code className="text-xs bg-surface-600 px-1.5 py-0.5 rounded">ml/nlp/skill_extraction_eval.py</code>), not
+              a one-time number I'm asking you to trust blindly.
             </li>
             <li className="text-gray-300 leading-relaxed">
               <strong className="text-white">GradientBoostingClassifier</strong>: this is the one I want to be most
-              careful about. I cannot honestly report a general real-world accuracy number for this model, and here's
-              exactly why. An accuracy number requires a ground truth to measure against: actual hire or reject decisions
-              tied to actual resumes and actual job postings, at a scale and breadth that generalizes. I looked,
-              specifically, for a public dataset like that. It effectively doesn't exist at production scale, because
-              that data is commercially sensitive HR data companies don't publish. There is one narrow, real exception,
-              described below, but it's a 2001 to 2002 study of entry-level clerical and sales roles in two U.S. cities.
-              Genuinely real, but far too small and narrow to be a general accuracy claim. So outside that one case, any
-              accuracy number I could show you would actually be measuring agreement with a synthetic, self-generated
-              heuristic I built for demonstration purposes, not real hiring accuracy. I'd rather tell you that plainly
-              than publish a number that looks rigorous but isn't.
+              careful about, and I went back and checked it precisely rather than repeating what I'd written before. I
+              pulled the actual training data the currently saved model was trained on: 251 labeled examples, 26 marked
+              hired and 225 marked not hired. Every single one of those 251, all of them, comes from a synthetic
+              candidate matched against a synthetic job. Zero come from a real person. That means any accuracy number
+              this model reports right now would be measuring how well it agrees with this platform's own synthetic
+              hiring simulator, not real hiring behavior, and I'm not going to present that as "model accuracy" because
+              it wouldn't be true. I also found precisely why the one dataset that does have real hiring outcomes, the
+              audit study below with 4,870 real application decisions, isn't reaching this model at all. The code that
+              syncs a hiring outcome onto a match result only runs at the moment an application is saved, and only
+              updates a match result that already exists at that exact instant. Most of those real applications were
+              imported before batch matching had ever run for their jobs, so that sync fired once, found nothing yet to
+              update, and never ran again later when a match result finally existed. The real signal is sitting right
+              there in the database. It just never got wired into what this model actually learns from. That is fixable,
+              narrowly: a direct comparison of those 4,870 real outcomes against match scores, computed on demand rather
+              than through that one-shot sync, would give one honest, narrow, real accuracy number, scoped specifically
+              to a 2001 to 2002 study of entry-level clerical and sales roles in two U.S. cities. I haven't built that
+              yet. Until I do, or until an organization logs enough of its own real hiring decisions to train on
+              responsibly, I'd rather tell you plainly that this model's accuracy is not something I can honestly show
+              you today than publish a number that looks rigorous but isn't.
+            </li>
+            <li className="text-gray-300 leading-relaxed">
+              <strong className="text-white">The name-bias probe</strong>: unlike the classifier above, this one has a
+              real, already-run result, not just a plan. I explain the full test further down this page, but the number
+              itself: across 300 real candidate and job pairs and 24 real-name variants per resume, average score
+              movement between White-coded and Black-coded names was 0.0019, statistically indistinguishable from zero.
+              There was some sensitivity to a name being present at all (about 0.056 on average), but it didn't
+              consistently favor either group. It's a small, bounded test, not a certification that bias is impossible,
+              but it's a real number from a real run, reproducible any time from
+              {' '}<code className="text-xs bg-surface-600 px-1.5 py-0.5 rounded">ml/fairness/name_bias_probe.py</code>.
             </li>
             <li className="text-gray-300 leading-relaxed">
               <strong className="text-white">A bug I found and fixed while checking my own work</strong>: while
