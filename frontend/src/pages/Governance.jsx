@@ -1,14 +1,23 @@
 import { Link } from 'react-router-dom'
-import { ArrowLeft, Mail } from 'lucide-react'
+import { ArrowLeft, Download, Mail } from 'lucide-react'
 import LogoIcon from '../components/LogoIcon'
 
 export default function Governance() {
   return (
     <div className="min-h-screen bg-surface-900 text-white">
       <div className="max-w-3xl mx-auto px-6 py-12">
-        <Link to="/about" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors mb-8">
-          <ArrowLeft className="w-4 h-4" /> Back to About
-        </Link>
+        <div className="no-print flex items-center justify-between mb-8">
+          <Link to="/about" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors">
+            <ArrowLeft className="w-4 h-4" /> Back to About
+          </Link>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="btn-secondary text-sm"
+          >
+            <Download className="w-4 h-4" /> Download as PDF
+          </button>
+        </div>
 
         <div className="flex items-center gap-3 mb-8">
           <LogoIcon size={40} />

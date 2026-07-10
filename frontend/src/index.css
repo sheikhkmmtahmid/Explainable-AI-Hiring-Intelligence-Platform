@@ -44,3 +44,60 @@
     @apply text-2xl font-bold text-white;
   }
 }
+
+/* Print stylesheet for the public About/Governance pages -- these are
+   dark-themed on screen, but a printed or PDF-saved copy should read like
+   an ordinary document: dark text on white, no nav chrome, no buttons. */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  html, body {
+    background: #fff !important;
+  }
+
+  .bg-surface-900,
+  .bg-surface-700,
+  .bg-surface-600,
+  .bg-surface-500,
+  .card {
+    background: #fff !important;
+    box-shadow: none !important;
+  }
+
+  .text-white,
+  .text-gray-300,
+  .text-gray-400,
+  .text-gray-500,
+  .text-gray-600 {
+    color: #1a1a1a !important;
+  }
+
+  .text-scarlet-300,
+  .text-scarlet-400 {
+    color: #7a1a1a !important;
+    text-decoration: underline;
+  }
+
+  .border-surface-400,
+  .border-surface-500,
+  .divide-surface-400 > * + * {
+    border-color: #ccc !important;
+  }
+
+  .decoration-gray-600,
+  .decoration-scarlet-800 {
+    text-decoration-color: #999 !important;
+  }
+
+  section, .card {
+    break-inside: avoid;
+  }
+
+  a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.75em;
+    color: #555;
+  }
+}

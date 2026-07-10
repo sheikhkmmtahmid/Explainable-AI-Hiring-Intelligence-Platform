@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ArrowLeft, ExternalLink, Mail } from 'lucide-react'
+import { ArrowLeft, Download, ExternalLink, Mail } from 'lucide-react'
 import LogoIcon from '../components/LogoIcon'
 
 const DATASETS = [
@@ -73,9 +73,18 @@ export default function About() {
   return (
     <div className="min-h-screen bg-surface-900 text-white">
       <div className="max-w-3xl mx-auto px-6 py-12">
-        <Link to="/" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors mb-8">
-          <ArrowLeft className="w-4 h-4" /> Back to the app
-        </Link>
+        <div className="no-print flex items-center justify-between mb-8">
+          <Link to="/" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors">
+            <ArrowLeft className="w-4 h-4" /> Back to the app
+          </Link>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="btn-secondary text-sm"
+          >
+            <Download className="w-4 h-4" /> Download as PDF
+          </button>
+        </div>
 
         <div className="flex items-center gap-3 mb-8">
           <LogoIcon size={40} />
