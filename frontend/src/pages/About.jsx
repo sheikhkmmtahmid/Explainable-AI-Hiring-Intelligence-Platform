@@ -276,10 +276,24 @@ export default function About() {
               just this one dataset.
             </li>
             <li className="text-gray-300 leading-relaxed">
-              One thing I want to be clear about: I have not retrained the saved model on this new real data yet.
-              4,870 real labeled examples now exist and are ready to train on, which is a real change from before,
-              but the model actually running on this platform right now has not learned from them yet. Retraining it
-              is the next step, not something I am claiming is already done.
+              I have not retrained the saved model on this new real data, and I want to explain the actual reason,
+              not just call it a future step. The audit study's own researchers designed it to hold resume quality
+              roughly constant and randomize one thing: a name signaling race and gender, so they could isolate its
+              effect on callbacks. That means whether someone got a callback in this data was driven substantially
+              by a signal I deliberately never feed into this classifier at all, since protected attributes are
+              excluded from matching on purpose. Training a model built on semantic similarity, skill overlap,
+              experience, and education against outcomes that were mostly explained by something outside those
+              inputs would not teach it what makes a good match. It would just fit whatever weak, coincidental
+              patterns happen to exist between my features and an outcome that is mostly noise as far as those
+              features are concerned.
+            </li>
+            <li className="text-gray-300 leading-relaxed">
+              There is a second reason on top of that. Every one of these 4,870 real examples comes from one
+              narrow slice: entry level clerical and sales jobs, in two U.S. cities, over twenty years ago. If I
+              trained on that and then used the result to score, say, a senior engineering role or a nurse
+              practitioner role today, I would be trusting a model far outside anything it was ever actually
+              validated on. Good practice means not deploying a model past the range it was tested on, and right
+              now that range is one narrow study, not a broad picture of real hiring.
             </li>
             <li className="text-gray-300 leading-relaxed">
               <strong className="text-white">The name-bias probe</strong>: unlike the classifier above, this one has a
