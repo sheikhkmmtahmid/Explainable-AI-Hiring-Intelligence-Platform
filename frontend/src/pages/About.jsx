@@ -121,40 +121,82 @@ export default function About() {
             <div className="card p-5">
               <h3 className="font-semibold text-white mb-1">SBERT (Sentence-BERT)</h3>
               <p className="text-sm text-gray-400 mb-2">Compares the <em>meaning</em> of two pieces of text, not just their words.</p>
-              <p className="text-sm text-gray-300">
+              <p className="text-sm text-gray-300 mb-3">
                 Example: a resume that says "built REST APIs with Django" and a job that asks for "backend web service
                 development experience" share almost no exact words, but SBERT recognizes they mean nearly the same
                 thing. This is what powers the semantic-similarity part of every match score.
+              </p>
+              <p className="text-sm text-gray-500 border-t border-surface-500 pt-3">
+                <strong className="text-gray-400">Why this one, and what I looked at instead:</strong> this platform
+                needs to embed a growing pool of tens of thousands of resumes and jobs on a small, self-hosted server
+                with no GPU, so speed matters as much as raw quality. I checked all-mpnet-base-v2, a stronger sibling
+                in the same family, and three models actually built for job or resume matching specifically:
+                TechWolf's JobBERT-v2 (public, English, trained on real job ads, but built to match short job titles
+                against skill lists, not full descriptions), CareerBERT (a model fine-tuned specifically to match
+                resumes to ESCO job categories, exactly the right idea, but trained on German text), and
+                conSultantBERT (a Randstad research model trained on 270,000 real resume-vacancy pairs that reportedly
+                beats generic models, but never released publicly). Each had a real reason it did not fit. I go
+                through the full comparison, with real numbers and links, further down this page.
               </p>
             </div>
 
             <div className="card p-5">
               <h3 className="font-semibold text-white mb-1">spaCy</h3>
               <p className="text-sm text-gray-400 mb-2">Reads a resume and pulls out structured facts: skills, job titles, companies, dates.</p>
-              <p className="text-sm text-gray-300">
+              <p className="text-sm text-gray-300 mb-3">
                 Example: given a paragraph of work history, spaCy is what identifies "Senior Data Analyst," "Acme Corp,"
                 and "Jan 2021 to Mar 2024" as a single structured entry, and separately picks "Python," "SQL," and "Tableau"
                 out as skills. This is how a candidate's skill list and years of experience get built automatically.
+              </p>
+              <p className="text-sm text-gray-500 border-t border-surface-500 pt-3">
+                <strong className="text-gray-400">Why this one, and what I looked at instead:</strong> resumes get
+                parsed asynchronously, sometimes in batches, so throughput matters. spaCy's small English pipeline
+                processes thousands of words per second on ordinary CPU hardware. Flair and Stanford's Stanza both
+                report slightly higher raw accuracy on standard NER benchmarks, but both run several times slower,
+                which adds up when many resumes parse at once. NLTK, the older standard Python NLP library, is really
+                built for teaching and research, not a production extraction pipeline. I also considered sending
+                resumes to a cloud NLP API like AWS Comprehend, but that means sending candidate personal data to a
+                third party and paying per request at scale, which I would rather avoid. I did not use spaCy's own
+                larger transformer pipeline either, for the same reason: meaningfully slower for a modest accuracy gain.
               </p>
             </div>
 
             <div className="card p-5">
               <h3 className="font-semibold text-white mb-1">GradientBoostingClassifier</h3>
               <p className="text-sm text-gray-400 mb-2">Combines the semantic score, skill overlap, experience, and education into one final match percentage.</p>
-              <p className="text-sm text-gray-300">
+              <p className="text-sm text-gray-300 mb-3">
                 This is the model that's actually trained. Everything above feeds into it as input; it learns from
                 labeled examples of who was hired versus rejected which combination of factors actually predicted a
                 good match, and it's what SHAP and LIME explain when you click "Explain" on a match score.
+              </p>
+              <p className="text-sm text-gray-500 border-t border-surface-500 pt-3">
+                <strong className="text-gray-400">Why this one, and what I looked at instead:</strong> it ships as
+                part of scikit-learn, which this project already depends on, so it adds no extra install to the
+                deployed container. XGBoost is generally the stronger performer for this kind of small tabular
+                classification task, and the code already switches to it automatically the moment it is installed,
+                but adding a large compiled dependency was not worth it until there was enough real training data to
+                make the upgrade matter. LightGBM and CatBoost are comparable, well-regarded alternatives in the same
+                family that I have not specifically evaluated for this project.
               </p>
             </div>
 
             <div className="card p-5">
               <h3 className="font-semibold text-white mb-1">SHAP &amp; LIME</h3>
               <p className="text-sm text-gray-400 mb-2">Explain, after the fact, why the GradientBoostingClassifier gave the score it gave.</p>
-              <p className="text-sm text-gray-300">
+              <p className="text-sm text-gray-300 mb-3">
                 Example: instead of just showing "78% match," the explanation shows "+12% for skill overlap, +9% for
                 semantic similarity, and minus 4% for experience gap," so a recruiter can see the actual reasoning, not
                 just trust a number.
+              </p>
+              <p className="text-sm text-gray-500 border-t border-surface-500 pt-3">
+                <strong className="text-gray-400">Why both, and what I looked at instead:</strong> they make different
+                tradeoffs, and showing both means a recruiter is not trusting a single method blindly. SHAP is the
+                more rigorous of the two, grounded in game theory, and gives the same answer every time you ask it.
+                LIME is faster and gives a quick local approximation, but it can give a slightly different answer if
+                asked twice for the same prediction, since it works by sampling nearby examples rather than an exact
+                calculation. I also looked at Anchors, which explains a prediction as a rule rather than a set of
+                weighted factors, but it answers a different question than "why this score," so it felt like a
+                separate feature rather than a replacement for either of these.
               </p>
             </div>
           </div>

@@ -293,6 +293,33 @@ These are the fixed weights the platform falls back to until an organization has
 
 ---
 
+## Why These Models
+
+Each of the four models in this stack was picked for a specific reason, and each had real alternatives that were considered and not used. This section documents that, so the choices read as deliberate rather than arbitrary.
+
+**SBERT (all-MiniLM-L6-v2)** needs to embed a growing pool of tens of thousands of resumes and jobs on a small, self-hosted server with no GPU, so speed matters as much as raw quality. Alternatives considered:
+- `all-mpnet-base-v2`, a stronger sibling in the same sentence-transformers family, scores higher on general benchmarks but runs about 5x slower.
+- [TechWolf/JobBERT-v2](https://huggingface.co/TechWolf/JobBERT-v2), public, English, MIT licensed, trained on 5.5M+ real US job ads. Not used because it is built to match short job titles against skill lists (64-token practical limit), not full job descriptions or resumes.
+- [CareerBERT](https://huggingface.co/lwolfrum2/careerbert-g), a model fine-tuned specifically to match resumes to ESCO job categories, exactly the right concept, and its own paper reports it beating generic baselines. Not used because it is trained on German text (`deepset/gbert-base`), not English.
+- conSultantBERT (Randstad, [paper](https://arxiv.org/abs/2109.06501)), trained on 270,000 real resume-vacancy pairs and reported to outperform generic SBERT baselines. Not used because it was never released publicly, no weights, no code.
+
+**spaCy (en_core_web_sm)** parses resumes asynchronously, sometimes in batches, so throughput matters. Alternatives considered:
+- Flair and Stanford's Stanza report slightly higher accuracy on standard NER benchmarks, but both run several times slower on CPU.
+- NLTK is the older standard Python NLP library, built more for teaching and research than a production extraction pipeline.
+- A cloud NLP API (AWS Comprehend, Google Cloud Natural Language) was considered and rejected: it means sending candidate personal data to a third party and paying per request at scale.
+- spaCy's own larger transformer pipeline (`en_core_web_trf`) was also not used, for the same reason as the mpnet comparison above: meaningfully slower for a modest accuracy gain.
+
+**GradientBoostingClassifier (scikit-learn)** ships as part of scikit-learn, which this project already depends on, so it adds no extra install to the deployed container. Alternatives considered:
+- XGBoost is generally the stronger performer for this kind of small tabular classification task, and `ml/matching/trainer.py` already switches to it automatically the moment it is installed. It was not added to `requirements/` because pulling in a large compiled dependency was not worth it until there was enough real training data to make the upgrade matter.
+- LightGBM and CatBoost are comparable, well-regarded alternatives in the same family that have not been specifically evaluated for this project.
+
+**SHAP and LIME together** make different tradeoffs, and showing both means no single method is trusted blindly.
+- SHAP is the more rigorous of the two, grounded in Shapley values from game theory, and gives the same answer every time it is asked.
+- LIME is faster and gives a quick local approximation, but it can give a slightly different answer if asked twice for the same prediction, since it works by sampling nearby examples rather than an exact calculation.
+- Anchors was considered: it explains a prediction as a rule rather than a set of weighted factors, which answers a different question than "why this score," so it reads as a separate feature rather than a replacement for either method above.
+
+---
+
 ## Model Reliability
 
 Not every model in this stack can honestly claim the same kind of reliability number, and this section says exactly which is which rather than implying they're all equally validated.
