@@ -217,12 +217,24 @@ export default function About() {
               update and never tried again later.
             </li>
             <li className="text-gray-300 leading-relaxed">
-              This is fixable. I could compare those 4,870 real outcomes directly against match scores instead of
-              relying on that one time copy step, which would give one honest, narrow, real accuracy number. It would
-              only cover a 2001 to 2002 study of entry level clerical and sales jobs in two U.S. cities, so it would
-              not be a broad claim, but it would be real. I have not built that yet. Until I do, or until a company
-              using this platform logs enough real hiring decisions of its own, I would rather tell you plainly that I
-              cannot show you this model's accuracy today than give you a number that looks solid but is not.
+              This was fixable, so I fixed it. I wrote a script that scores every one of those 4,812 real application
+              pairs that never had a match score, using only what was already sitting in the database: real resumes,
+              real jobs, and the real skills and embeddings already extracted from them during import. Nothing new
+              was downloaded or added. Then I labeled all 4,870 real applications the way the study itself actually
+              measured success: 392 real callbacks as the positive outcome, 4,478 real non-callbacks as the negative
+              outcome. That is now sitting in the database as real, correctly labeled data.
+            </li>
+            <li className="text-gray-300 leading-relaxed">
+              I also fixed the actual bug, not just the backlog it left behind. The matching code now checks, every
+              time it runs for a job, whether a real hiring decision already exists for that job, and relabels the
+              results to match. So the same gap should not happen again for any future real decision, on any job, not
+              just this one dataset.
+            </li>
+            <li className="text-gray-300 leading-relaxed">
+              One thing I want to be clear about: I have not retrained the saved model on this new real data yet.
+              4,870 real labeled examples now exist and are ready to train on, which is a real change from before,
+              but the model actually running on this platform right now has not learned from them yet. Retraining it
+              is the next step, not something I am claiming is already done.
             </li>
             <li className="text-gray-300 leading-relaxed">
               <strong className="text-white">The name-bias probe</strong>: unlike the classifier above, this one has a

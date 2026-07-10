@@ -217,6 +217,7 @@ def run_batch_matching_for_job(job_id: int) -> int:
     from django.utils import timezone
     from apps.jobs.models import JobPost
     from apps.candidates.models import Candidate
+    from apps.applications.models import Application
     from .models import MatchResult, MatchBatchRun
 
     job = JobPost.objects.get(id=job_id)
@@ -275,6 +276,25 @@ def run_batch_matching_for_job(job_id: int) -> int:
     # Delete stale results; MySQL/TiDB lacks update_conflicts+unique_fields support
     MatchResult.objects.filter(job=job).delete()
     MatchResult.objects.bulk_create(results, batch_size=500)
+
+    # bulk_create never fires Django signals, so the Application-save signal
+    # that syncs MatchResult.hired (apps/applications/signals.py) never runs
+    # for rows created here -- this is the one-shot gap: a real hire/reject
+    # decision recorded before this job was ever matched would otherwise be
+    # lost forever, and even a decision recorded after re-running matching
+    # gets wiped by the delete() above. Re-sync it here, every run, from
+    # whatever real decisions already exist for this job.
+    real_decisions = dict(
+        Application.objects.filter(
+            job=job, status__in=[Application.Status.HIRED, Application.Status.REJECTED]
+        ).values_list("candidate_id", "status")
+    )
+    if real_decisions:
+        to_relabel = list(MatchResult.objects.filter(job=job, candidate_id__in=real_decisions.keys()))
+        for mr in to_relabel:
+            mr.hired = real_decisions[mr.candidate_id] == Application.Status.HIRED
+        MatchResult.objects.bulk_update(to_relabel, ["hired"], batch_size=500)
+        logger.info("Re-synced hired for %s real decision(s) on job=%s", len(to_relabel), job_id)
 
     # Assign ranks via bulk_update (one UPDATE per candidate, batched)
     sorted_results = sorted(results, key=lambda r: r.overall_score, reverse=True)
