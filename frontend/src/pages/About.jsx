@@ -177,8 +177,11 @@ export default function About() {
               exact numbers depending on which evaluation writeup I checked (the mid-80s figure ranged from about 82 to
               85 across sources), which is normal since benchmark scores can shift a little as evaluation code and
               dataset versions get updated over time. Rather than freeze one exact decimal here that could go stale,
-              I'd point you to the model's own page on Hugging Face and the public MTEB leaderboard for the current
-              number. What matters most for this platform: that score measures general sentence similarity, not
+              here are the actual live sources for the current number: the model's own {' '}
+              <a href="https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2" target="_blank" rel="noopener noreferrer" className="text-scarlet-400 hover:text-scarlet-300 underline decoration-scarlet-800">page on Hugging Face</a>
+              {' '}and the public{' '}
+              <a href="https://huggingface.co/spaces/mteb/leaderboard" target="_blank" rel="noopener noreferrer" className="text-scarlet-400 hover:text-scarlet-300 underline decoration-scarlet-800">MTEB leaderboard</a>.
+              What matters most for this platform: that score measures general sentence similarity, not
               hiring success, so it should be read as this model's reputation on its own task, never as this
               platform's accuracy.
             </li>
