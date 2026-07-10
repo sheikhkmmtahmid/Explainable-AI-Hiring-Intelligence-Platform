@@ -33,6 +33,7 @@ export default function Dashboard() {
   const activeJobs = summary?.active_jobs ?? jobs.filter(j => j.status === 'active').length
   const totalCandidates = summary?.total_candidates ?? candidates.length
   const totalMatches = summary?.total_matches ?? 0
+  const avgMatchScore = summary?.avg_match_score
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -46,8 +47,24 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard icon={Briefcase}   label="Total Jobs"      value={totalJobs.toLocaleString()}       sub={`${activeJobs.toLocaleString()} active`} accent />
         <StatCard icon={Users}       label="Candidates"      value={totalCandidates.toLocaleString()} sub="in database" />
-        <StatCard icon={GitMerge}    label="Matches Run"     value={totalMatches.toLocaleString()}    sub="across all jobs" />
-        <StatCard icon={TrendingUp}  label="Avg Match Score" value="—"                                sub="overall" />
+        <StatCard
+          icon={GitMerge}
+          label="Matches Run"
+          value={totalMatches.toLocaleString()}
+          sub="across all jobs"
+          tooltip="Every candidate-job pair ever scored, across every job that's had matching run. Most jobs match against the whole candidate pool, so this is much bigger than just the top-ranked results you see on a job page."
+        />
+        <StatCard
+          icon={TrendingUp}
+          label="Avg Match Score"
+          value={avgMatchScore != null ? `${(avgMatchScore * 100).toFixed(0)}%` : '—'}
+          sub="overall"
+          tooltip={
+            avgMatchScore != null
+              ? "Average overall score across every match result computed platform-wide, including low-relevance pairs, not just top matches. A low number here is expected and doesn't mean matching is broken."
+              : "Shows once at least one match has been computed. Currently empty because no MatchResult rows exist yet, or the average couldn't be calculated."
+          }
+        />
       </div>
 
       {/* Recent Jobs */}

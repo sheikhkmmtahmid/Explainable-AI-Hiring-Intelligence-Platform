@@ -62,6 +62,12 @@ def get_platform_summary(organization_id=None) -> dict:
             | Q(applications__job__organization_id=organization_id)
         ).distinct()
 
+    # Average across every computed MatchResult, not just top-ranked ones --
+    # batch matching scores a job against the whole candidate pool, so most
+    # rows are low-relevance pairs by design. This number reflects that
+    # full pool, not "how good are the matches recruiters actually see."
+    avg_match_score = matches.aggregate(avg=Avg("overall_score"))["avg"]
+
     return {
         "total_candidates": candidates.count(),
         "synthetic_candidates": candidates.filter(is_synthetic=True).count(),
@@ -69,4 +75,5 @@ def get_platform_summary(organization_id=None) -> dict:
         "active_jobs": jobs.filter(status="active").count(),
         "total_applications": applications.count(),
         "total_matches": matches.count(),
+        "avg_match_score": round(avg_match_score, 4) if avg_match_score is not None else None,
     }
