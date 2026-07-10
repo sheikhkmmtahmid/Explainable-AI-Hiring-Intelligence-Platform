@@ -10,12 +10,9 @@ export default function StatCard({ icon: Icon, label, value, sub, accent = false
         <p className="text-sm text-gray-500 font-medium flex items-center gap-1.5">
           {label}
           {tooltip && (
-            <Info
-              tabIndex={0}
-              title={tooltip}
-              aria-label={tooltip}
-              className="w-3.5 h-3.5 text-gray-600 hover:text-gray-400 focus:text-gray-400 outline-none cursor-help flex-shrink-0"
-            />
+            <span tabIndex={0} title={tooltip} aria-label={tooltip} className="outline-none cursor-help flex-shrink-0">
+              <Info className="w-3.5 h-3.5 text-gray-600 hover:text-gray-400" />
+            </span>
           )}
         </p>
         <p className="text-2xl font-bold text-white mt-0.5">{value ?? '—'}</p>
