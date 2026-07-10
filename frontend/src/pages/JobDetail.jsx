@@ -78,6 +78,38 @@ export default function JobDetail() {
     }
   }, [])
 
+  // A page left open in one tab has no way to know matching ran again
+  // somewhere else (another tab, another person, a re-run) -- it only ever
+  // fetched match results once, on mount. Quietly re-check every 30s (and
+  // whenever the tab becomes visible again) and silently pick up new
+  // results, so an already-open job page doesn't sit on a stale ranking
+  // indefinitely. Skipped while the 5s "Run Matching" poll above is
+  // already active, so the two don't double up.
+  useEffect(() => {
+    const checkForFreshMatches = () => {
+      if (polling || document.hidden) return
+      getTopCandidates(id, 20)
+        .then(({ data }) => {
+          if (!mounted.current) return
+          setMatches((current) => {
+            const changed = data.length !== current.length || data.some((m, i) => m.id !== current[i]?.id)
+            if (changed && (current.length > 0 || data.length > 0)) {
+              toast('Match results updated', { icon: '🔄' })
+            }
+            return changed ? data : current
+          })
+        })
+        .catch(() => {})
+    }
+
+    const interval = setInterval(checkForFreshMatches, 30000)
+    document.addEventListener('visibilitychange', checkForFreshMatches)
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', checkForFreshMatches)
+    }
+  }, [id, polling])
+
   const fetchApplications = () => {
     setLoadingApplications(true)
     getApplications({ job: id, page_size: 100 })
